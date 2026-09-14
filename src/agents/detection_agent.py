@@ -1,14 +1,13 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import IsolationForest
-import os
 
 class DetectionAgent:
-    def __init__(self, data_path="data/training_core.csv"):
-        self.data_path = data_path
-        self.model = None
-        
-        # 17개의 핵심 센서 리스트 (PHM 2018 기반)
+    """
+    순수 원본 스트림을 받아서 감지만 수행하는 에이전트.
+    이상치(Anomaly)는 "yellow", 오류(Fault)는 "red"로 분류하여 신호를 보냅니다.
+    """
+    def __init__(self):
+        # 17개의 핵심 센서
         self.features = [
             'IONGAUGEPRESSURE', 'ETCHBEAMVOLTAGE', 'ETCHBEAMCURRENT', 
             'ETCHSUPPRESSORVOLTAGE', 'ETCHSUPPRESSORCURRENT', 'FLOWCOOLFLOWRATE', 
@@ -17,32 +16,40 @@ class DetectionAgent:
             'FIXTURESHUTTERPOSITION', 'ETCHSOURCEUSAGE', 'ETCHAUXSOURCETIMER', 
             'ETCHAUX2SOURCETIMER', 'ACTUALSTEPDURATION'
         ]
+        # 실시간 Z-score 기반 감지를 위한 상태 저장 (간이 이동 평균)
+        self.history = pd.DataFrame(columns=self.features)
+        self.max_history = 1000  # 최근 1000개 데이터 기준
         
-    def train(self, train_df: pd.DataFrame):
+    def detect(self, incoming_chunk: pd.DataFrame) -> str:
         """
-        Phase 5: 17차원 다변량 데이터 기반 Isolation Forest 학습
-        (Streaming DataLoader에서 생성된 첫 번째 Chunk 등 연속된 정상 데이터를 받아서 학습)
+        들어온 스트림 데이터 청크를 평가하여 상태(normal, yellow, red) 반환
         """
-        print("[Detection Agent] Training Isolation Forest on normal samples with 17 features...")
+        # 결측치가 있으면 이전 상태를 유지 (원본 데이터 특성 고려)
+        chunk = incoming_chunk[self.features].ffill().bfill()
         
-        # 정상 데이터(label == 0)만 추출하여 정상 패턴 학습
-        normal_data = train_df[train_df['label'] == 0][self.features]
-        
-        # 오염도(contamination)는 아주 낮게 설정하여 극단적인 이상치만 잡아내도록 함
-        self.model = IsolationForest(contamination=0.01, random_state=42)
-        self.model.fit(normal_data)
-        print("[Detection Agent] Training Complete.")
-        
-    def detect(self, incoming_data: pd.DataFrame) -> bool:
-        """
-        실시간으로 들어온 센서 데이터 프레임에서 이상이 있는지 판별
-        """
-        if self.model is None:
-            raise ValueError("Model is not trained yet. Call train() first.")
+        # 아직 히스토리가 부족하면 정상으로 간주하고 데이터 누적
+        if len(self.history) < 100:
+            self.history = pd.concat([self.history, chunk]).tail(self.max_history)
+            return "normal"
             
-        # 모델 추론 (-1 이면 이상, 1 이면 정상)
-        X = incoming_data[self.features]
-        predictions = self.model.predict(X)
+        # 히스토리의 평균과 표준편차 계산
+        mean = self.history.mean()
+        std = self.history.std() + 1e-6 # 0으로 나누기 방지
         
-        # 단 하나의 시점이라도 이상치(-1)로 판별되면 True 반환
-        return -1 in predictions
+        # 현재 청크의 평균적인 센서값
+        current_vals = chunk.mean()
+        
+        # Z-Score 계산 (얼마나 평소와 다른가?)
+        z_scores = np.abs((current_vals - mean) / std)
+        max_z = z_scores.max() # 가장 크게 튀는 센서의 Z-score
+        
+        # 데이터를 업데이트
+        self.history = pd.concat([self.history, chunk]).tail(self.max_history)
+        
+        # 룰 베이스: 이상치(Yellow)와 오류(Red) 구분
+        if max_z > 5.0:
+            return "red"     # 심각한 오류 (Fault)
+        elif max_z > 3.0:
+            return "yellow"  # 이상치 경고 (Anomaly)
+        else:
+            return "normal"  # 정상
