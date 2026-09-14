@@ -18,20 +18,16 @@ class DetectionAgent:
             'ETCHAUX2SOURCETIMER', 'ACTUALSTEPDURATION'
         ]
         
-    def train(self):
+    def train(self, train_df: pd.DataFrame):
         """
         Phase 5: 17차원 다변량 데이터 기반 Isolation Forest 학습
+        (Streaming DataLoader에서 생성된 첫 번째 Chunk 등 연속된 정상 데이터를 받아서 학습)
         """
-        if not os.path.exists(self.data_path):
-            raise FileNotFoundError(f"Core training data not found at {self.data_path}. Please run preprocess_phm.py first.")
-            
-        print("[Detection Agent] Loading core dataset for training...")
-        df = pd.read_csv(self.data_path)
+        print("[Detection Agent] Training Isolation Forest on normal samples with 17 features...")
         
         # 정상 데이터(label == 0)만 추출하여 정상 패턴 학습
-        normal_data = df[df['label'] == 0][self.features]
+        normal_data = train_df[train_df['label'] == 0][self.features]
         
-        print(f"[Detection Agent] Training Isolation Forest on {len(normal_data)} normal samples with {len(self.features)} features...")
         # 오염도(contamination)는 아주 낮게 설정하여 극단적인 이상치만 잡아내도록 함
         self.model = IsolationForest(contamination=0.01, random_state=42)
         self.model.fit(normal_data)
@@ -42,7 +38,7 @@ class DetectionAgent:
         실시간으로 들어온 센서 데이터 프레임에서 이상이 있는지 판별
         """
         if self.model is None:
-            self.train()
+            raise ValueError("Model is not trained yet. Call train() first.")
             
         # 모델 추론 (-1 이면 이상, 1 이면 정상)
         X = incoming_data[self.features]
