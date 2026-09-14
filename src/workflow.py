@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from src.agents.graph_state import AgentState
 from src.agents.main_agent import MainAgent
 from src.agents.maintenance_agent import MaintenanceAgent
-from src.agents.rag_agent import MockRAGAgent
+from src.agents.rag_agent import OracleRAGAgent
 import pandas as pd
 
 def compile_workflow():
@@ -10,7 +10,7 @@ def compile_workflow():
     workflow = StateGraph(AgentState)
     
     # 에이전트 인스턴스화
-    rag_agent = MockRAGAgent()
+    rag_agent = OracleRAGAgent()
     main_agent = MainAgent(model_name="qwen2.5:7b")
     maintenance_agent = MaintenanceAgent(model_name="qwen2.5:7b")
     
@@ -39,14 +39,22 @@ def compile_workflow():
     def maintenance_node(state: AgentState):
         return maintenance_agent.evaluate_feedback(state)
         
-    # 5. DB Update Node: 최종 평가를 DB에 저장 (Phase 3에서 본격 구현, Phase 2는 로깅만)
+    # 5. DB Update Node: 최종 평가를 Oracle DB에 저장
     def db_update_node(state: AgentState):
-        print("--- [Node: DB Update] Saving evaluation to Vector DB ---")
+        print("--- [Node: DB Update] Saving evaluation to Oracle DB ---")
         is_false_alarm = state.get("is_false_alarm")
+        feedback = state.get("engineer_feedback")
+        
+        # 실제 환경에서는 여기서 oracledb connection을 열어 INSERT를 수행합니다.
+        # 예시: 
+        # sql = "INSERT INTO maintenance_history (pattern_desc, is_false_alarm) VALUES (:1, :2)"
+        # cursor.execute(sql, (feedback, int(is_false_alarm)))
+        # conn.commit()
+        
         if is_false_alarm:
-            print("Action: 해당 시계열 패턴을 '가성 불량'으로 라벨링하여 RAG DB 업데이트.")
+            print("Action: 해당 시계열 패턴을 '가성 불량'으로 라벨링하여 Oracle DB(maintenance_history)에 저장.")
         else:
-            print("Action: 해당 정비 이력 및 성공 여부를 RAG DB 업데이트.")
+            print("Action: 해당 정비 이력 및 성공 여부를 Oracle DB(maintenance_history)에 업데이트.")
         return {"next_step": "end"}
 
     # 노드 등록

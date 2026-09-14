@@ -1,71 +1,83 @@
 import pandas as pd
 import numpy as np
+import os
+import oracledb
+from dotenv import load_dotenv
 
-class MockRAGAgent:
+class OracleRAGAgent:
     def __init__(self):
-        # 가상의 과거 정비 이력 DB
-        self.history_db = [
-            {
-                "id": 1,
-                "pattern_desc": "High temperature and high vibration",
-                "temp_mean": 65.0,
-                "vib_mean": 1.2,
-                "cause": "Bearing wear",
-                "action": "Replace bearing",
-                "success_rate": 0.95
-            },
-            {
-                "id": 2,
-                "pattern_desc": "High temperature, normal vibration",
-                "temp_mean": 60.0,
-                "vib_mean": 0.6,
-                "cause": "Cooling fan failure",
-                "action": "Check and replace cooling fan",
-                "success_rate": 0.88
-            },
-            {
-                "id": 3,
-                "pattern_desc": "Normal temperature, high vibration",
-                "temp_mean": 50.0,
-                "vib_mean": 1.5,
-                "cause": "Misalignment",
-                "action": "Realign the shaft",
-                "success_rate": 0.92
-            },
-            {
-                "id": 4,
-                "pattern_desc": "Short spike in temperature (False Alarm)",
-                "temp_mean": 55.0,
-                "vib_mean": 0.5,
-                "cause": "Sensor Glitch",
-                "action": "Ignore or recalibrate sensor",
-                "success_rate": 0.99
-            }
-        ]
+        load_dotenv()
+        self.user = os.getenv("ORACLE_USER")
+        self.password = os.getenv("ORACLE_PASSWORD")
+        self.dsn = os.getenv("ORACLE_DSN")
         
-    def search_similar_pattern(self, anomaly_data):
+    def get_connection(self):
+        if not all([self.user, self.password, self.dsn]):
+            raise ValueError("Oracle DB connection info is missing in .env")
+        return oracledb.connect(user=self.user, password=self.password, dsn=self.dsn)
+        
+    def search_similar_pattern(self, anomaly_data: pd.DataFrame):
         """
-        Phase 1: 임시로 이상 데이터의 평균값을 기반으로 가장 유사한 과거 사례를 검색.
-        (실제로는 시계열 임베딩 간의 코사인 유사도를 계산해야 함)
+        Phase 3: Oracle DB(RDB)에 쿼리를 날려 가장 유사한 통계값을 가진 이력을 검색
         """
         target_temp = anomaly_data['temperature'].mean()
         target_vib = anomaly_data['vibration'].mean()
         
-        best_match = None
-        min_distance = float('inf')
-        
-        for record in self.history_db:
-            # Simple Euclidean distance in feature space
-            dist = np.sqrt((record['temp_mean'] - target_temp)**2 + (record['vib_mean'] - target_vib)**2)
-            if dist < min_distance:
-                min_distance = dist
-                best_match = record
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # 유클리드 거리 기반 유사도 계산 쿼리 (온도와 진동의 차이 제곱합이 가장 작은 레코드 1개 추출)
+            # Oracle 12c 이상 문법 (FETCH FIRST 1 ROWS ONLY)
+            query = """
+            SELECT id, pattern_desc, temp_mean, vib_mean, cause, action_taken, success_rate 
+            FROM maintenance_history 
+            ORDER BY POWER(temp_mean - :1, 2) + POWER(vib_mean - :2, 2) ASC
+            FETCH FIRST 1 ROWS ONLY
+            """
+            
+            cursor.execute(query, (target_temp, target_vib))
+            row = cursor.fetchone()
+            
+            if row:
+                best_match = {
+                    "id": row[0],
+                    "pattern_desc": row[1],
+                    "temp_mean": row[2],
+                    "vib_mean": row[3],
+                    "cause": row[4],
+                    "action": row[5],
+                    "success_rate": row[6]
+                }
+                return best_match
+            else:
+                return {"error": "No maintenance history found in DB."}
                 
-        return best_match
+        except Exception as e:
+            print(f"[RAG Agent DB Error] {e}")
+            # DB 연결 실패시 Fallback Mock Data 반환
+            return {
+                "id": -1,
+                "pattern_desc": "Fallback (DB Connection Failed)",
+                "temp_mean": target_temp,
+                "vib_mean": target_vib,
+                "cause": "Unknown",
+                "action": "Check DB Connection",
+                "success_rate": 0.0
+            }
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
     
-    def generate_action_report(self, anomaly_data):
+    def generate_action_report(self, anomaly_data: pd.DataFrame):
+        # LangGraph 구조 이전의 구형 메서드 (호환성 유지)
         match = self.search_similar_pattern(anomaly_data)
         
+        if "error" in match:
+            return match["error"]
+            
         report = f"""
         [Action Report]
         - 유사 과거 사례 ID: {match['id']}
@@ -76,11 +88,11 @@ class MockRAGAgent:
         return report
 
 if __name__ == "__main__":
-    # Test Mock RAG
+    # Test Oracle RAG
     mock_anomaly = pd.DataFrame({
         'temperature': [64.0, 65.5, 66.0],
         'vibration': [1.1, 1.2, 1.3]
     })
     
-    agent = MockRAGAgent()
+    agent = OracleRAGAgent()
     print(agent.generate_action_report(mock_anomaly))

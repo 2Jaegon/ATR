@@ -4,7 +4,7 @@ scikit-learn
 matplotlib
 langgraph
 langchain
-langchain-openai
+langchain-ollama
 langchain-community
-faiss-cpu
 python-dotenv
+oracledb
