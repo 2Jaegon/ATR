@@ -49,19 +49,6 @@ class DetectionAgent:
             windows.append(data[i:i + self.seq_len])
         return torch.FloatTensor(np.array(windows))
         
-    def _train_pytorch_model(self, model, X_train, name, lr, epochs=15):
-        criterion = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=lr)
-        model.train()
-        print(f"  [{name}] 최적 구조로 정식 학습 진행 중 (LR: {lr:.5f})...")
-        for epoch in range(epochs):
-            optimizer.zero_grad()
-            output = model(X_train)
-            loss = criterion(output, X_train)
-            loss.backward()
-            optimizer.step()
-        return model
-
     def _get_dl_scores(self, model, X_tensor):
         model.eval()
         with torch.no_grad():
@@ -127,6 +114,8 @@ class DetectionAgent:
         ).to(self.device)
         self.best_lrs['LSTM'] = lstm_params['lr']
         
+        from tqdm import tqdm
+        
         # ---------------------------------------------------------
         # Phase 1: 개별 모델 정식 학습 (재조립된 최적의 모델로)
         # ---------------------------------------------------------
@@ -135,9 +124,22 @@ class DetectionAgent:
         tensor_val_norm = self._create_windows(X_val_norm).to(self.device)
         tensor_fault = self._create_windows(X_fault).to(self.device)
         
-        self.model_tr = self._train_pytorch_model(self.model_tr, tensor_train_norm, "Transformer AE", self.best_lrs['TR'])
-        self.model_gnn = self._train_pytorch_model(self.model_gnn, tensor_train_norm, "Spatial GNN AE", self.best_lrs['GNN'])
-        self.model_lstm = self._train_pytorch_model(self.model_lstm, tensor_train_norm, "LSTM AE", self.best_lrs['LSTM'])
+        def _train_with_progress(model, X_train, name, lr, epochs=15):
+            criterion = nn.MSELoss()
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            model.train()
+            print(f"  [{name}] 학습 진행 중...")
+            for epoch in tqdm(range(epochs), desc=f"{name} Epochs", leave=False):
+                optimizer.zero_grad()
+                output = model(X_train)
+                loss = criterion(output, X_train)
+                loss.backward()
+                optimizer.step()
+            return model
+            
+        self.model_tr = _train_with_progress(self.model_tr, tensor_train_norm, "Transformer AE", self.best_lrs['TR'])
+        self.model_gnn = _train_with_progress(self.model_gnn, tensor_train_norm, "Spatial GNN AE", self.best_lrs['GNN'])
+        self.model_lstm = _train_with_progress(self.model_lstm, tensor_train_norm, "LSTM AE", self.best_lrs['LSTM'])
         
         # ---------------------------------------------------------
         # Phase 2: 메타 러닝 (앙상블 가중치 최적화)
@@ -170,18 +172,23 @@ class DetectionAgent:
         best_margin = -999.0
         
         weights_grid = np.arange(0.0, 1.1, 0.1)
-        for w1 in weights_grid:
-            for w2 in weights_grid:
-                w3 = 1.0 - w1 - w2
-                if w3 < -0.01: continue
-                
-                ens_val = w1 * tr_val_norm + w2 * gnn_val_norm + w3 * lstm_val_norm
-                ens_fault = w1 * tr_fault_norm + w2 * gnn_fault_norm + w3 * lstm_fault_norm
-                
-                margin = np.mean(ens_fault) - np.max(ens_val)
-                if margin > best_margin:
-                    best_margin = margin
-                    best_w = {'TR': w1, 'GNN': w2, 'LSTM': w3}
+        # 총 경우의 수 계산 (w1, w2 탐색)
+        total_combinations = len(weights_grid) * len(weights_grid)
+        
+        with tqdm(total=total_combinations, desc="Weight Optimization Grid Search", leave=False) as pbar:
+            for w1 in weights_grid:
+                for w2 in weights_grid:
+                    w3 = 1.0 - w1 - w2
+                    pbar.update(1)
+                    if w3 < -0.01: continue
+                    
+                    ens_val = w1 * tr_val_norm + w2 * gnn_val_norm + w3 * lstm_val_norm
+                    ens_fault = w1 * tr_fault_norm + w2 * gnn_fault_norm + w3 * lstm_fault_norm
+                    
+                    margin = np.mean(ens_fault) - np.max(ens_val)
+                    if margin > best_margin:
+                        best_margin = margin
+                        best_w = {'TR': w1, 'GNN': w2, 'LSTM': w3}
                     
         self.weights = best_w
         print(f"  --> [가중치 최적화 완료] Transformer({self.weights['TR']:.2f}) / GNN({self.weights['GNN']:.2f}) / LSTM({self.weights['LSTM']:.2f})")

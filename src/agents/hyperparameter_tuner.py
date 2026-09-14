@@ -30,9 +30,11 @@ class OptunaTuner:
         criterion = nn.MSELoss()
         optimizer = optim.Adam(model.parameters(), lr=lr)
         
+        from tqdm import tqdm
+        
         # 모델 학습 (빠른 튜닝을 위해 epoch를 적게 설정)
         model.train()
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs), desc="Tuner Epochs", leave=False):
             optimizer.zero_grad()
             output = model(X_train)
             loss = criterion(output, X_train)
