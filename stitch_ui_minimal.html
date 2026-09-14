@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATR Oculus // Semiconductor Predictive Telemetry</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+            mono: ['"SF Mono"', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', 'Courier New', 'monospace'],
+          },
+          colors: {
+            subtle: {
+              50: '#F9FAFB',
+              100: '#F3F4F6',
+              200: '#E5E7EB',
+              300: '#D1D5DB',
+              400: '#9CA3AF',
+              500: '#6B7280',
+              600: '#4B5563',
+              700: '#374151',
+              800: '#1F2937',
+              900: '#111827',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Clean micro-smoothing */
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.3);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-[#FBFBFD] text-[#1D1D1F] dark:bg-[#0D0D0E] dark:text-[#F5F5F7] min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-neutral-200 dark:selection:bg-neutral-800">
+
+  <!-- TOP HEADER -->
+  <header class="w-full border-b border-[#E5E5EA] dark:border-[#242426] bg-[#FBFBFD]/80 dark:bg-[#0D0D0E]/80 backdrop-blur-md sticky top-0 z-30 px-6 lg:px-10 py-3.5 flex items-center justify-between transition-colors">
+    <div class="flex items-center gap-6">
+      <div class="flex items-baseline gap-2">
+        <span class="text-base font-semibold tracking-tight text-black dark:text-white">ATR Oculus</span>
+        <span class="text-xs font-normal text-neutral-400 dark:text-neutral-500 tracking-normal">Telemetry &middot; Fab 04</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-2 pl-4 border-l border-neutral-200 dark:border-neutral-800">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400" id="global-status-text">System Nominal &middot; Active Ingestion</span>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="flex items-center gap-4">
+      <div class="hidden md:flex items-center gap-5 text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+        <span>VAC: 1.42&times;10⁻⁶ Torr</span>
+        <span>TEMP: 312.4&deg;C</span>
+        <span>RF: 13.56 MHz</span>
+      </div>
+
+      <!-- Dark Mode Toggle Button -->
+      <button id="themeToggleBtn" type="button" aria-label="Toggle Theme"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#18181B] hover:border-neutral-300 dark:hover:border-neutral-700 text-xs font-medium text-neutral-700 dark:text-neutral-200 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <!-- Sun Icon -->
+        <svg id="sunIcon" class="w-3.5 h-3.5 hidden dark:inline-block text-neutral-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"></circle>
+          <path stroke-linecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+        </svg>
+        <!-- Moon Icon -->
+        <svg id="moonIcon" class="w-3.5 h-3.5 inline-block dark:hidden text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+        </svg>
+        <span id="themeToggleText">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="flex-1 w-full max-w-[1500px] mx-auto p-6 lg:p-10">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- LEFT COLUMN (2/3 width) -->
+      <section class="lg:col-span-2 flex flex-col gap-6">
+        
+        <!-- Live Sensor Telemetry Canvas Container -->
+        <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-neutral-100 dark:border-neutral-800/80">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold tracking-tight text-black dark:text-white">Real-Time Sensor Telemetry</h2>
+                <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">Node 84-Alpha</span>
+              </div>
+              <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">Plasma Etch Chamber 3 &middot; High-Frequency Ingestion</p>
+            </div>
+
+            <!-- Legend Pills -->
+            <div class="flex items-center gap-4 text-xs font-mono text-neutral-500 dark:text-neutral-400">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-2.5 h-[2px] rounded-full bg-emerald-500"></span> RF Impedance
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-2.5 h-[2px] rounded-full bg-indigo-500"></span> Piezo Acoustic
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-2.5 h-[2px] rounded-full bg-amber-500"></span> Thermal Drift
+              </span>
+            </div>
+          </div>
+
+          <!-- Live Canvas Graph -->
+          <div class="mt-4 relative w-full h-[320px]">
+            <canvas id="sensorChart" class="w-full h-full block"></canvas>
+            <div class="absolute bottom-2 left-2 text-[10px] font-mono text-neutral-400 dark:text-neutral-600 pointer-events-none">
+              Window: T-60s &rarr; T-0s [LIVE 60Hz]
+            </div>
+          </div>
+
+          <!-- Quick Metrics Bar -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 mt-4 border-t border-neutral-100 dark:border-neutral-800/80">
+            <div>
+              <div class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Mean Deviation</div>
+              <div class="text-sm font-mono font-medium text-neutral-800 dark:text-neutral-200 mt-1">0.012 &mu;m</div>
+            </div>
+            <div>
+              <div class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Harmonic Dist.</div>
+              <div class="text-sm font-mono font-medium text-neutral-800 dark:text-neutral-200 mt-1">0.81 dB</div>
+            </div>
+            <div>
+              <div class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Substrate Tilt</div>
+              <div class="text-sm font-mono font-medium text-neutral-800 dark:text-neutral-200 mt-1">0.003&deg;</div>
+            </div>
+            <div>
+              <div class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">RUL Estimate</div>
+              <div class="text-sm font-mono font-medium text-neutral-800 dark:text-neutral-200 mt-1">&gt; 1,420 hrs</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 AI Model Cards -->
+        <div>
+          <div class="flex items-center justify-between mb-3 px-1">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Neural Anomaly Ensembles</h3>
+            <span class="text-xs font-mono text-neutral-400 dark:text-neutral-500">Inference Latency: 4.1ms</span>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <!-- Model 1: TR-AE -->
+            <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold tracking-tight text-black dark:text-white">TR-AE</span>
+                  <span class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">Nominal</span>
+                </div>
+                <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1 leading-snug">Transformer autoencoder temporal reconstruction</p>
+              </div>
+
+              <div class="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/60">
+                <div class="flex items-baseline justify-between">
+                  <span class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Loss Score</span>
+                  <span class="text-xs font-mono text-neutral-400">Limit: 0.050</span>
+                </div>
+                <div id="score-tr" class="text-2xl font-semibold font-mono tracking-tight text-neutral-900 dark:text-neutral-100 mt-1">
+                  0.0142
+                </div>
+                <!-- Progress bar -->
+                <div class="w-full bg-neutral-100 dark:bg-neutral-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div id="bar-tr" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 28%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Model 2: ST-GNN -->
+            <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold tracking-tight text-black dark:text-white">ST-GNN</span>
+                  <span class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">Nominal</span>
+                </div>
+                <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1 leading-snug">Spatio-temporal graph net for wafer topology</p>
+              </div>
+
+              <div class="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/60">
+                <div class="flex items-baseline justify-between">
+                  <span class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Loss Score</span>
+                  <span class="text-xs font-mono text-neutral-400">Limit: 0.065</span>
+                </div>
+                <div id="score-gnn" class="text-2xl font-semibold font-mono tracking-tight text-neutral-900 dark:text-neutral-100 mt-1">
+                  0.0218
+                </div>
+                <div class="w-full bg-neutral-100 dark:bg-neutral-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div id="bar-gnn" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 33%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Model 3: LSTM-AE -->
+            <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold tracking-tight text-black dark:text-white">LSTM-AE</span>
+                  <span class="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full">Attention</span>
+                </div>
+                <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1 leading-snug">Recurrent network for gas decay signatures</p>
+              </div>
+
+              <div class="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/60">
+                <div class="flex items-baseline justify-between">
+                  <span class="text-[11px] text-neutral-400 uppercase tracking-wider font-medium">Loss Score</span>
+                  <span class="text-xs font-mono text-neutral-400">Limit: 0.055</span>
+                </div>
+                <div id="score-lstm" class="text-2xl font-semibold font-mono tracking-tight text-amber-600 dark:text-amber-400 mt-1">
+                  0.0489
+                </div>
+                <div class="w-full bg-neutral-100 dark:bg-neutral-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div id="bar-lstm" class="bg-amber-500 h-full rounded-full transition-all duration-300" style="width: 88%"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- RIGHT COLUMN (1/3 width) -->
+      <section class="flex flex-col gap-6">
+
+        <!-- Circular Progress Ring (Composite Health / Final Score) -->
+        <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold tracking-tight text-black dark:text-white">Composite Health</h2>
+            <span class="text-xs font-mono text-neutral-400">MTBF: 99.98%</span>
+          </div>
+
+          <div class="flex flex-col items-center justify-center py-4">
+            <!-- Minimal SVG Circular Progress Ring -->
+            <div class="relative w-44 h-44 flex items-center justify-center">
+              <svg class="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                <!-- Background Ring -->
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="66"
+                  fill="transparent"
+                  stroke-width="7"
+                  class="stroke-neutral-100 dark:stroke-neutral-800"
+                />
+                <!-- Value Indicator Ring (Apple style flat color stroke) -->
+                <circle
+                  id="score-circle-bar"
+                  cx="80"
+                  cy="80"
+                  r="66"
+                  fill="transparent"
+                  stroke-width="7"
+                  stroke-linecap="round"
+                  stroke-dasharray="414.69"
+                  stroke-dashoffset="66.35"
+                  class="stroke-emerald-500 transition-all duration-700 ease-out"
+                />
+              </svg>
+
+              <!-- Center Text Content -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span class="text-[11px] font-medium tracking-wide uppercase text-neutral-400">Final Score</span>
+                <span id="final-score" class="text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white font-sans mt-0.5">84</span>
+                <span class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">HEALTHY / PASS</span>
+              </div>
+            </div>
+
+            <!-- Substats -->
+            <div class="grid grid-cols-2 w-full gap-3 mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/80 text-center">
+              <div>
+                <div class="text-[10px] uppercase font-mono text-neutral-400">Anomaly Prob.</div>
+                <div class="text-xs font-semibold text-neutral-800 dark:text-neutral-200 mt-0.5 font-mono">6.4% (Low)</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase font-mono text-neutral-400">Drift Index</div>
+                <div class="text-xs font-semibold text-neutral-800 dark:text-neutral-200 mt-0.5 font-mono">0.018 &sigma;</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAG Console / Maintenance Logs -->
+        <div class="bg-white dark:bg-[#141416] border border-[#E5E5EA] dark:border-[#222226] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-colors flex-1 flex flex-col min-h-[360px]">
+          <div class="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800/80">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500"></span>
+              <h2 class="text-sm font-semibold tracking-tight text-black dark:text-white">RAG Maintenance Console</h2>
+            </div>
+            <span class="text-[11px] font-mono text-neutral-400">FAISS v4.2</span>
+          </div>
+
+          <!-- Clean text log output container -->
+          <div id="rag-console" class="custom-scroll flex-1 overflow-y-auto font-mono text-xs text-neutral-600 dark:text-neutral-300 py-3 space-y-3 leading-relaxed">
+            <div class="text-neutral-400 dark:text-neutral-500">[03:42:01 UTC] Vector store connected. Corpus: Semiconductor SOP standard revision 72 loaded.</div>
+            
+            <div class="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/50">
+              <span class="text-indigo-600 dark:text-indigo-400 font-medium">[03:42:15] QUERY:</span> RF matching network minor variance detected.
+              <div class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Context retrieved: "SOP-SEC-72. Inspect capacitor C14 bias voltage. Typical capacitor dielectric degradation under CF4 chemistry."</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/50">
+              <span class="text-amber-600 dark:text-amber-400 font-medium">[03:42:33] ADVISORY:</span> LSTM-AE drift indicator +1.8 sccm mass flow.
+              <div class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Suggested action: Recommended purge cycle during next batch interchange (Wafer #321).</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/50">
+              <span class="text-emerald-600 dark:text-emerald-400 font-medium">[03:43:00] SYNTHESIS:</span> Operational threshold within safety bounds. Automatic recalibration queued for T+45m.
+            </div>
+          </div>
+
+          <!-- Console input prompt -->
+          <div class="pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center gap-2">
+            <input 
+              type="text" 
+              placeholder="Query maintenance vector base..." 
+              class="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs font-mono placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-600 text-neutral-800 dark:text-neutral-200 transition-colors"
+            />
+            <button class="px-3 py-2 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-lg text-xs font-medium hover:opacity-90 transition-opacity">
+              Ask
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MINIMAL FOOTER -->
+  <footer class="w-full border-t border-neutral-200/80 dark:border-neutral-800/80 py-4 px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 dark:text-neutral-500 font-mono">
+    <div>ATR Oculus Core v2.9.4 &middot; Applied Telemetry Robotics</div>
+    <div class="flex items-center gap-4 mt-2 sm:mt-0">
+      <span>Security: Level-5 Cleanroom</span>
+      <span>AES-256-GCM</span>
+    </div>
+  </footer>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    // --- 1. DARK MODE TOGGLE LOGIC ---
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeToggleText = document.getElementById('themeToggleText');
+    const htmlEl = document.documentElement;
+
+    function applyTheme(isDark) {
+      if (isDark) {
+        htmlEl.classList.add('dark');
+        themeToggleText.textContent = 'Light';
+        localStorage.setItem('atr_theme', 'dark');
+      } else {
+        htmlEl.classList.remove('dark');
+        themeToggleText.textContent = 'Dark';
+        localStorage.setItem('atr_theme', 'light');
+      }
+    }
+
+    // Default to Light mode per user prompt instructions
+    const savedTheme = localStorage.getItem('atr_theme');
+    if (savedTheme === 'dark') {
+      applyTheme(true);
+    } else {
+      applyTheme(false); // Clean white tone light mode default
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      const isCurrentlyDark = htmlEl.classList.contains('dark');
+      applyTheme(!isCurrentlyDark);
+    });
+
+    // --- 2. LIVE DATA SENSOR CANVAS ---
+    const canvas = document.getElementById('sensorChart');
+    const ctx = canvas.getContext('2d');
+
+    // Buffer dimensions
+    let dpr = window.devicePixelRatio || 1;
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Stream generation state
+    const pointCount = 120;
+    const seriesRF = Array.from({length: pointCount}, (_, i) => 0.5 + Math.sin(i * 0.1) * 0.15 + (Math.random() - 0.5) * 0.05);
+    const seriesPiezo = Array.from({length: pointCount}, (_, i) => 0.4 + Math.cos(i * 0.08) * 0.12 + (Math.random() - 0.5) * 0.04);
+    const seriesThermal = Array.from({length: pointCount}, (_, i) => 0.65 + Math.sin(i * 0.05) * 0.08 + (Math.random() - 0.5) * 0.03);
+
+    let phase = 0;
+
+    function drawChart() {
+      const w = canvas.getBoundingClientRect().width;
+      const h = canvas.getBoundingClientRect().height;
+      ctx.clearRect(0, 0, w, h);
+
+      const isDark = htmlEl.classList.contains('dark');
+
+      // Apple-style clean minimal grid lines
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+      ctx.lineWidth = 1;
+
+      // 4 horizontal guidelines
+      for (let i = 1; i <= 3; i++) {
+        const y = (h / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Helper function to plot lines
+      function renderSeries(data, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.75;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+
+        const step = w / (data.length - 1);
+        for (let i = 0; i < data.length; i++) {
+          const x = i * step;
+          const y = h - (data[i] * (h * 0.7) + h * 0.15);
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+      }
+
+      // Draw lines: RF (Emerald), Piezo (Indigo), Thermal (Amber)
+      renderSeries(seriesRF, '#10B981');
+      renderSeries(seriesPiezo, '#6366F1');
+      renderSeries(seriesThermal, '#F59E0B');
+    }
+
+    // Tick update loop
+    let tickCount = 0;
+    function updateData() {
+      phase += 0.05;
+      
+      // Shift left and append new realistic jittered sensor reading
+      seriesRF.shift();
+      seriesRF.push(0.5 + Math.sin(phase * 1.2) * 0.18 + (Math.random() - 0.5) * 0.06);
+
+      seriesPiezo.shift();
+      seriesPiezo.push(0.4 + Math.cos(phase * 0.9) * 0.14 + (Math.random() - 0.5) * 0.04);
+
+      seriesThermal.shift();
+      seriesThermal.push(0.65 + Math.sin(phase * 0.6) * 0.09 + (Math.random() - 0.5) * 0.02);
+
+      drawChart();
+
+      // Subtle dynamic updates to loss scores every ~1.5s
+      tickCount++;
+      if (tickCount % 45 === 0) {
+        const trScore = (0.0135 + Math.random() * 0.0018).toFixed(4);
+        const gnnScore = (0.0210 + Math.random() * 0.0022).toFixed(4);
+        const lstmScore = (0.0480 + Math.random() * 0.0025).toFixed(4);
+
+        const trEl = document.getElementById('score-tr');
+        const gnnEl = document.getElementById('score-gnn');
+        const lstmEl = document.getElementById('score-lstm');
+
+        if (trEl) trEl.textContent = trScore;
+        if (gnnEl) gnnEl.textContent = gnnScore;
+        if (lstmEl) lstmEl.textContent = lstmScore;
+      }
+
+      requestAnimationFrame(updateData);
+    }
+
+    requestAnimationFrame(updateData);
+
+  </script>
+</body>
+</html>
