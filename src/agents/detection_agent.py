@@ -1,66 +1,52 @@
 import pandas as pd
-from sklearn.ensemble import IsolationForest
 import numpy as np
+from sklearn.ensemble import IsolationForest
+import os
 
 class DetectionAgent:
-    def __init__(self, contamination=0.05):
-        self.model = IsolationForest(contamination=contamination, random_state=42)
-        self.is_trained = False
+    def __init__(self, data_path="data/training_core.csv"):
+        self.data_path = data_path
+        self.model = None
         
-    def train(self, normal_data):
-        """정상 데이터로 모델 학습"""
-        features = normal_data[['temperature', 'vibration']]
-        self.model.fit(features)
-        self.is_trained = True
-        print("Detection Agent trained successfully on normal data.")
+        # 17개의 핵심 센서 리스트 (PHM 2018 기반)
+        self.features = [
+            'IONGAUGEPRESSURE', 'ETCHBEAMVOLTAGE', 'ETCHBEAMCURRENT', 
+            'ETCHSUPPRESSORVOLTAGE', 'ETCHSUPPRESSORCURRENT', 'FLOWCOOLFLOWRATE', 
+            'FLOWCOOLPRESSURE', 'ETCHGASCHANNEL1READBACK', 'ETCHPBNGASREADBACK', 
+            'FIXTURETILTANGLE', 'ROTATIONSPEED', 'ACTUALROTATIONANGLE', 
+            'FIXTURESHUTTERPOSITION', 'ETCHSOURCEUSAGE', 'ETCHAUXSOURCETIMER', 
+            'ETCHAUX2SOURCETIMER', 'ACTUALSTEPDURATION'
+        ]
         
-    def detect(self, data):
-        """새로운 데이터에서 이상 탐지"""
-        if not self.is_trained:
-            raise ValueError("Model is not trained yet.")
+    def train(self):
+        """
+        Phase 5: 17차원 다변량 데이터 기반 Isolation Forest 학습
+        """
+        if not os.path.exists(self.data_path):
+            raise FileNotFoundError(f"Core training data not found at {self.data_path}. Please run preprocess_phm.py first.")
+            
+        print("[Detection Agent] Loading core dataset for training...")
+        df = pd.read_csv(self.data_path)
         
-        features = data[['temperature', 'vibration']]
-        # predict returns 1 for inliers, -1 for outliers
-        predictions = self.model.predict(features)
-        # convert to 0 (normal), 1 (anomaly)
-        anomaly_labels = np.where(predictions == -1, 1, 0)
+        # 정상 데이터(label == 0)만 추출하여 정상 패턴 학습
+        normal_data = df[df['label'] == 0][self.features]
         
-        results = data.copy()
-        results['detected_anomaly'] = anomaly_labels
+        print(f"[Detection Agent] Training Isolation Forest on {len(normal_data)} normal samples with {len(self.features)} features...")
+        # 오염도(contamination)는 아주 낮게 설정하여 극단적인 이상치만 잡아내도록 함
+        self.model = IsolationForest(contamination=0.01, random_state=42)
+        self.model.fit(normal_data)
+        print("[Detection Agent] Training Complete.")
         
-        # Calculate decision function scores (lower = more abnormal)
-        scores = self.model.decision_function(features)
-        results['anomaly_score'] = scores
+    def detect(self, incoming_data: pd.DataFrame) -> bool:
+        """
+        실시간으로 들어온 센서 데이터 프레임에서 이상이 있는지 판별
+        """
+        if self.model is None:
+            self.train()
+            
+        # 모델 추론 (-1 이면 이상, 1 이면 정상)
+        X = incoming_data[self.features]
+        predictions = self.model.predict(X)
         
-        return results
-
-if __name__ == "__main__":
-    # Test the agent
-    data_path = 'data/sensor_data.csv'
-    try:
-        df = pd.read_csv(data_path)
-        
-        # Assume first 200 rows are mostly normal for training
-        train_data = df.iloc[:200]
-        test_data = df
-        
-        agent = DetectionAgent(contamination=0.05)
-        agent.train(train_data)
-        
-        results = agent.detect(test_data)
-        
-        # Evaluation
-        # True anomalies (including false alarms for now, as both look abnormal to the sensor)
-        actual_anomalies = results[results['label'] > 0]
-        detected_anomalies = results[results['detected_anomaly'] == 1]
-        
-        print(f"Total rows: {len(results)}")
-        print(f"Actual Anomalies (including false alarms): {len(actual_anomalies)}")
-        print(f"Detected Anomalies: {len(detected_anomalies)}")
-        
-        # How many true anomalies were caught?
-        caught = results[(results['label'] > 0) & (results['detected_anomaly'] == 1)]
-        print(f"True Anomalies caught: {len(caught)}")
-        
-    except FileNotFoundError:
-        print("Run generate_data.py first to create the dataset.")
+        # 단 하나의 시점이라도 이상치(-1)로 판별되면 True 반환
+        return -1 in predictions
