@@ -1,17 +1,19 @@
 import pandas as pd
 import numpy as np
 import os
-from sklearn.ensemble import RandomForestClassifier
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
+from src.models.transformer_ae import TransformerAE
 
 class DetectionAgent:
     """
-    순수 머신러닝(ML) 기반 감지 에이전트.
-    초기화 시 원본 데이터와 정답지(faults)를 바탕으로 학습한 뒤,
-    스트리밍되는 실시간 데이터의 상태(normal, yellow, red)를 빠르고 정확하게 판별합니다.
-    (LLM을 사용하지 않는 순수 ML 영역)
+    SOTA 딥러닝(Transformer Autoencoder) 기반 감지 에이전트.
+    초기화 시 정상 데이터를 학습하여 센서 간의 시간/공간적 인과관계를 파악(복원)하는 능력을 기릅니다.
+    실시간 데이터 복원 오차(Reconstruction Error)를 계산하여 이상 상태를 판별합니다.
     """
-    def __init__(self):
+    def __init__(self, seq_len=5):
         self.features = [
             'IONGAUGEPRESSURE', 'ETCHBEAMVOLTAGE', 'ETCHBEAMCURRENT', 
             'ETCHSUPPRESSORVOLTAGE', 'ETCHSUPPRESSORCURRENT', 'FLOWCOOLFLOWRATE', 
@@ -20,80 +22,125 @@ class DetectionAgent:
             'FIXTURESHUTTERPOSITION', 'ETCHSOURCEUSAGE', 'ETCHAUXSOURCETIMER', 
             'ETCHAUX2SOURCETIMER', 'ACTUALSTEPDURATION'
         ]
-        self.model = RandomForestClassifier(n_estimators=50, random_state=42, max_depth=5)
+        self.seq_len = seq_len
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        self.model = TransformerAE(num_features=len(self.features)).to(self.device)
         self.scaler = StandardScaler()
         self.is_trained = False
         
-    def train(self, data_file: str, fault_file: str):
-        print(f"[Detection Agent ML] 학습을 시작합니다... (이 과정은 최초 1회만 수행됩니다)")
+        self.yellow_threshold = 0.0
+        self.red_threshold = 0.0
         
-        # 정답지 로드
+    def _create_windows(self, data: np.ndarray) -> torch.Tensor:
+        """
+        시계열 데이터를 시퀀스 길이(seq_len)만큼 잘라서 윈도우 생성
+        shape: (num_windows, seq_len, features)
+        """
+        windows = []
+        for i in range(0, len(data) - self.seq_len + 1, self.seq_len):
+            windows.append(data[i:i + self.seq_len])
+        return torch.FloatTensor(np.array(windows))
+        
+    def train(self, data_file: str, fault_file: str):
+        print(f"[Detection Agent 딥러닝] 시계열 Transformer Autoencoder 학습 준비 중... (Device: {self.device})")
+        
         faults_df = pd.read_csv(fault_file)
-        if faults_df.empty:
-            raise ValueError("정답지(faults)가 비어있습니다.")
-            
         first_fault_time = faults_df['time'].iloc[0]
         
-        print(f"[Detection Agent ML] 원본 데이터({os.path.basename(data_file)}) 스캔 중...")
-        # 전체를 다 읽으면 너무 오래 걸리므로, 앞부분(약 100만 줄)만 읽어서 학습 데이터를 추출합니다.
-        # 현업에서는 하둡이나 스파크 등을 사용하지만, PoC를 위해 청크 리딩 사용
-        normal_data = pd.DataFrame()
-        fault_data = pd.DataFrame()
+        normal_data_list = []
+        fault_data_list = []
         
+        # 데이터 수집 (청크 리딩)
         chunk_iter = pd.read_csv(data_file, chunksize=50000)
         for chunk in chunk_iter:
             chunk = chunk.ffill().bfill()
             
-            # 1. 정상 데이터 수집 (처음 5000개만)
-            if len(normal_data) < 5000:
-                normal_data = pd.concat([normal_data, chunk.head(5000)])
+            # 1. 정상 데이터 수집 (처음 20000개 정도만 학습에 사용)
+            if len(normal_data_list) == 0:
+                normal_data_list.append(chunk.head(20000))
                 
-            # 2. 고장 데이터 수집 (정답지의 고장 시간 직전 데이터)
+            # 2. 고장 전조 데이터 수집 (임계치 설정용)
             if chunk['time'].iloc[0] <= first_fault_time <= chunk['time'].iloc[-1]:
                 target_idx = chunk[chunk['time'] <= first_fault_time].index
                 if len(target_idx) > 0:
-                    # 고장 직전 100개의 데이터를 '위험(고장 전조)'으로 추출
-                    fault_chunk = chunk.loc[target_idx[-100:]].copy()
-                    fault_data = pd.concat([fault_data, fault_chunk])
-                    break # 고장 데이터를 찾았으면 스캔 종료
+                    fault_data_list.append(chunk.loc[target_idx[-100:]])
+                    break
                     
-        # 학습용 데이터셋 구성 (Label: 0=Normal, 1=Fault/Anomaly)
-        normal_data['label'] = 0
-        fault_data['label'] = 1
+        normal_df = pd.concat(normal_data_list)
+        fault_df = pd.concat(fault_data_list)
         
-        train_df = pd.concat([normal_data, fault_data]).reset_index(drop=True)
-        X = train_df[self.features]
-        y = train_df['label']
+        # 스케일링 (정상 데이터 기준으로 핏팅)
+        normal_scaled = self.scaler.fit_transform(normal_df[self.features])
+        fault_scaled = self.scaler.transform(fault_df[self.features])
         
-        print(f"[Detection Agent ML] 정답지를 바탕으로 Random Forest 모델 학습 중... (정상: {len(normal_data)}개, 고장 전조: {len(fault_data)}개)")
+        # 시퀀스 텐서로 변환
+        X_train = self._create_windows(normal_scaled).to(self.device)
+        X_fault = self._create_windows(fault_scaled).to(self.device)
         
-        # 모델 안정성을 위해 스케일링 적용 (내부 ML 모델용)
-        X_scaled = self.scaler.fit_transform(X)
-        self.model.fit(X_scaled, y)
+        print(f"[Detection Agent 딥러닝] 정상 시퀀스 {len(X_train)}개, 고장 전조 시퀀스 {len(X_fault)}개 추출 완료")
+        print("[Detection Agent 딥러닝] Transformer 모델 복원(Reconstruction) 학습 시작...")
         
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+        
+        # 학습 루프 (Epoch 20)
+        self.model.train()
+        for epoch in range(20):
+            optimizer.zero_grad()
+            output = self.model(X_train)
+            loss = criterion(output, X_train)
+            loss.backward()
+            optimizer.step()
+            
+        print(f"[Detection Agent 딥러닝] 학습 완료! 최종 Normal MSE Loss: {loss.item():.4f}")
+        
+        # 임계치(Threshold) 설정
+        self.model.eval()
+        with torch.no_grad():
+            # 정상 데이터의 오차 분포
+            normal_pred = self.model(X_train)
+            normal_loss = torch.mean((normal_pred - X_train)**2, dim=(1,2)).cpu().numpy()
+            
+            # 고장 전조 데이터의 오차 분포
+            if len(X_fault) > 0:
+                fault_pred = self.model(X_fault)
+                fault_loss = torch.mean((fault_pred - X_fault)**2, dim=(1,2)).cpu().numpy()
+                self.red_threshold = np.min(fault_loss) * 0.8 # 고장 데이터 오차의 80% 선을 빨간점 기준으로
+            else:
+                self.red_threshold = np.max(normal_loss) * 5.0
+                
+            self.yellow_threshold = np.percentile(normal_loss, 99) # 정상 데이터 상위 1%를 노란점 기준으로
+            
+        print(f"[Detection Agent 딥러닝] 임계치 설정 완료 - Yellow(Anomaly): {self.yellow_threshold:.4f}, Red(Fault): {self.red_threshold:.4f}\n")
         self.is_trained = True
-        print("[Detection Agent ML] 머신러닝 두뇌 탑재 완료!\n")
         
     def detect(self, incoming_chunk: pd.DataFrame) -> str:
         """
-        스트리밍으로 들어오는 센서 청크를 ML 모델이 평가하여 상태 반환
+        스트리밍 청크(길이 5)를 모델에 통과시켜 복원 오차 계산
         """
         if not self.is_trained:
-            raise ValueError("모델이 학습되지 않았습니다. train()을 먼저 호출하세요.")
+            raise ValueError("모델이 학습되지 않았습니다.")
             
-        # 원본 데이터 그대로 받아서 내부적으로만 처리
+        # 정확히 모델이 요구하는 시퀀스 길이(seq_len)인지 확인
+        if len(incoming_chunk) != self.seq_len:
+            return "normal"
+            
         chunk = incoming_chunk[self.features].ffill().bfill()
-        X_scaled = self.scaler.transform(chunk)
+        scaled_data = self.scaler.transform(chunk)
         
-        # ML 모델 추론 (확률 반환)
-        # 클래스 1(고장 전조)일 확률
-        fault_probabilities = self.model.predict_proba(X_scaled)[:, 1]
-        max_prob = fault_probabilities.max()
+        # 차원 맞추기 (1, seq_len, features)
+        x_tensor = torch.FloatTensor(scaled_data).unsqueeze(0).to(self.device)
         
-        # ML 확률 기반 분류 (사용자 요구사항 반영)
-        if max_prob > 0.8:
-            return "red"     # 80% 이상 확신: 오류 (Fault)
-        elif max_prob > 0.4:
-            return "yellow"  # 40% 이상 확신: 이상치 경고 (Anomaly)
+        self.model.eval()
+        with torch.no_grad():
+            pred = self.model(x_tensor)
+            # MSE Loss 계산
+            loss = torch.mean((pred - x_tensor)**2).item()
+            
+        if loss > self.red_threshold:
+            return "red"
+        elif loss > self.yellow_threshold:
+            return "yellow"
         else:
-            return "normal"  # 정상
+            return "normal"
