@@ -11,6 +11,7 @@ def run_strict_orchestration():
     
     base_dir = "data/phm_data_challenge_2018/train"
     raw_data_file = os.path.join(base_dir, "05_M02_DC_train.csv")
+    fault_data_file = os.path.join(base_dir, "train_faults", "05_M02_train_fault_data.csv")
     
     if not os.path.exists(raw_data_file):
         print(f"Error: {raw_data_file} not found.")
@@ -21,8 +22,9 @@ def run_strict_orchestration():
     # 원본 데이터를 5행(초) 단위로 그냥 읽어옵니다. (데이터 조작 없음)
     streamer = RawDataLoader(raw_data_file, chunksize=5)
     
-    # 1. Detection Agent (오직 감지만 수행)
+    # 1. Detection Agent (오직 감지만 수행하되, 내부에 ML 두뇌 탑재)
     detector = DetectionAgent()
+    detector.train(raw_data_file, fault_data_file)
     
     # 2. Main Agent (워크플로우 총괄)
     app = compile_workflow()
@@ -41,7 +43,7 @@ def run_strict_orchestration():
         
         if status == "normal":
             if row_count % 5000 == 0:
-                print(f"Streaming... [Row {row_count}] Time: {current_time} | Status: 🟢 Normal")
+                print(f"Streaming... [Row {row_count}] Time: {current_time} | Status: [NORMAL]")
             continue
             
         # 노란점(이상치) 또는 빨간점(오류) 감지 시
