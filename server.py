@@ -1,3 +1,10 @@
+"""
+ATR Oculus 대시보드 서버
+========================
+- State-Aware 동적 앙상블 탐지 에이전트 연동
+- WebSocket을 통한 실시간 센서 + 문맥 데이터 스트리밍
+- 동적 가중치 및 POT 임계값 정보를 클라이언트에 전달
+"""
 import asyncio
 import json
 import os
@@ -44,11 +51,11 @@ async def upload_report(file: UploadFile = File(...)):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_name = f"{timestamp}_{file.filename}"
     filepath = os.path.join(UPLOAD_DIR, safe_name)
-    
+
     contents = await file.read()
     with open(filepath, "wb") as f:
         f.write(contents)
-    
+
     print(f"[Server] 정비 리포트 업로드 완료: {safe_name} ({len(contents)} bytes)")
     return JSONResponse({
         "status": "success",
@@ -82,71 +89,80 @@ async def download_report(filename: str):
 # WebSocket: 실시간 텔레메트리 스트리밍
 # ============================================================
 
+from src.agents.detection_agent import DetectionAgent
+import pandas as pd
+
+# 전역 DetectionAgent 인스턴스 (State-Aware 동적 앙상블)
+detector = DetectionAgent(seq_len=5)
+detector.load_weights()
+
 @app.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    
-    # 초기 설정 전송
+
+    # 초기 설정 전송 (POT 임계값 + 기본 가중치 포함)
     await websocket.send_json({
         "type": "init",
-        "weights": {"TR": 0.40, "GNN": 0.35, "LSTM": 0.25},
-        "yellow_threshold": 0.6,
-        "red_threshold": 0.8
+        "weights": detector.default_weights,
+        "yellow_threshold": detector.yellow_threshold,
+        "red_threshold": detector.red_threshold,
+        "pot_method": detector.pot_method
     })
-    
-    print("[Server] 클라이언트 연결! 스트리밍 시작...")
+
+    print("[Server] 클라이언트 연결! 실제 데이터 스트리밍 시작...")
     try:
-        base_pressure = 50.0
-        
-        while True:
-            base_pressure += random.uniform(-0.5, 0.5)
-            
-            tr_score = random.uniform(0.1, 0.4)
-            gnn_score = random.uniform(0.1, 0.4)
-            lstm_score = random.uniform(0.1, 0.4)
-            
-            # 이벤트 시뮬레이션
-            chance = random.random()
-            if chance < 0.03:
-                tr_score += 0.6; gnn_score += 0.5; lstm_score += 0.6
-                base_pressure += random.uniform(10.0, 15.0)
-            elif chance < 0.1:
-                tr_score += 0.3; gnn_score += 0.3; lstm_score += 0.4
-                base_pressure -= random.uniform(5.0, 8.0)
-                
-            final_score = 0.4*tr_score + 0.35*gnn_score + 0.25*lstm_score
-            
-            status = "normal"
-            if final_score > 0.8:
-                status = "red"
-            elif final_score > 0.6:
-                status = "yellow"
-                
+        # 실제 데이터 스트리밍 (05_M02_DC_train.csv 파일 사용)
+        csv_path = "data/phm_data_challenge_2018/train/05_M02_DC_train.csv"
+        if not os.path.exists(csv_path):
+            print(f"[Server] 오류: {csv_path} 파일을 찾을 수 없습니다.")
+            return
+
+        chunk_iter = pd.read_csv(csv_path, chunksize=5)
+
+        for chunk in chunk_iter:
+            chunk = chunk.ffill().bfill()
+
+            # State-Aware DetectionAgent를 통해 추론
+            # (문맥 변수 포함된 DataFrame 그대로 전달)
+            result = detector.detect(chunk)
+
+            raw_sensors = chunk.iloc[-1].to_dict()
+            base_pressure = raw_sensors.get('FLOWCOOLPRESSURE', 0)
+
             await websocket.send_json({
                 "type": "telemetry",
-                "status": status,
-                "final_score": final_score,
-                "scores": {"TR": tr_score, "GNN": gnn_score, "LSTM": lstm_score},
-                "sensor_value": float(base_pressure)
+                "status": result["status"],
+                "final_score": result["final_score"],
+                "scores": result["scores"],
+                "sensor_value": float(base_pressure),
+                "raw_sensors": {k: float(v) if isinstance(v, (int, float, np.floating, np.integer)) else str(v) 
+                                for k, v in raw_sensors.items()},
+                # 동적 가중치 & 문맥 정보 (대시보드 표시용)
+                "dynamic_weights": result["weights"],
+                "recipe_step": result["recipe_step"],
+                "thresholds": result["thresholds"]
             })
-            
-            if status == 'yellow':
+
+            if result["status"] == 'yellow':
                 await websocket.send_json({
                     "type": "report",
                     "status": "yellow",
-                    "message": "[경고] Flowcool Pressure 비정상 하강 감지. 과거 이력 분석: 밸브 미세 누수 의심. SOP-PMT-12 절차에 따라 밸브 점검을 권고합니다."
+                    "message": f"[경고] 장비 센서 이상 징후 감지. 최종 점수: {result['final_score']:.3f}. 주의가 필요합니다."
                 })
-            elif status == 'red':
+            elif result["status"] == 'red':
                 await websocket.send_json({
                     "type": "report",
                     "status": "red",
-                    "message": "[긴급] 압력 한계선 돌파! 즉각적인 장비 가동 중단(Interlock) 및 펌프 교체 요망. SOP-EMG-01 비상 대응 절차를 즉시 개시하십시오."
+                    "message": f"[긴급] 임계치 초과(Fault) 감지! 최종 점수: {result['final_score']:.3f}. 즉각 정비 요망."
                 })
-            
+
             await asyncio.sleep(0.5)
-            
+
     except WebSocketDisconnect:
         print("[Server] 클라이언트 연결 종료")
+
+# numpy 타입 JSON 직렬화 지원
+import numpy as np
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8088)

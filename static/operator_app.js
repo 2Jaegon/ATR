@@ -50,9 +50,10 @@ window.addEventListener('resize', resizeCanvas);
 
 let step = 0;
 const pointCount = 120;
-const seriesRF = Array(pointCount).fill(0.5);
-const seriesPiezo = Array(pointCount).fill(0.4);
-const seriesThermal = Array(pointCount).fill(0.65);
+const seriesFCP = Array(pointCount).fill(0.5);
+const seriesIGP = Array(pointCount).fill(0.5);
+const seriesEBV = Array(pointCount).fill(0.5);
+const seriesEBC = Array(pointCount).fill(0.5);
 
 function drawChart() {
   const w = canvas.getBoundingClientRect().width;
@@ -80,6 +81,7 @@ function drawChart() {
     const stepX = w / (data.length - 1);
     for (let i = 0; i < data.length; i++) {
       const x = i * stepX;
+      // 값 범위 조정 (간단한 정규화 후 시각적 분리)
       const y = h - (data[i] * (h * 0.7) + h * 0.15);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -87,9 +89,11 @@ function drawChart() {
     ctx.stroke();
   }
 
-  renderSeries(seriesRF, '#10B981', 2.2);
-  renderSeries(seriesPiezo, '#3B82F6', 2);
-  renderSeries(seriesThermal, '#F59E0B', 2);
+  // 색상 맵핑: FLOWCOOL(Green), IONGAUGE(Blue), ETCHBEAM_V(Amber), ETCHBEAM_I(Purple)
+  renderSeries(seriesFCP, '#10B981', 2.2);
+  renderSeries(seriesIGP, '#3B82F6', 2.0);
+  renderSeries(seriesEBV, '#F59E0B', 2.0);
+  renderSeries(seriesEBC, '#8B5CF6', 2.0);
 }
 
 // 4. DOM Elements
@@ -108,20 +112,30 @@ ws.onopen = () => {
   addAlertLog('시스템 연결 완료', 'ATR Oculus 실시간 스트림이 연결되었습니다.', 'normal');
 };
 
+function autoNormalize(val, min, max) {
+    if (val === undefined || isNaN(val)) return 0.5;
+    let norm = (val - min) / (max - min);
+    return Math.max(0, Math.min(1, norm));
+}
+
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
 
   if (msg.type === 'telemetry') {
-    // Update chart data
-    let norm = (msg.sensor_value - 10) / 80;
-    norm = Math.max(0, Math.min(1, norm));
-
-    seriesRF.shift();
-    seriesRF.push(norm);
-    seriesPiezo.shift();
-    seriesPiezo.push(Math.max(0, Math.min(1, norm * 0.8 + (Math.random() - 0.5) * 0.1)));
-    seriesThermal.shift();
-    seriesThermal.push(Math.max(0, Math.min(1, norm * 1.2 + (Math.random() - 0.5) * 0.1)));
+    // 실제 센서 데이터를 각각 정규화하여 캔버스에 추가 (시각적 구분을 위해 임의 범위 사용)
+    const raw = msg.raw_sensors || {};
+    
+    seriesFCP.shift();
+    seriesFCP.push(autoNormalize(raw['FLOWCOOLPRESSURE'], 0, 150) * 0.3 + 0.7); // 위쪽 배치
+    
+    seriesIGP.shift();
+    seriesIGP.push(autoNormalize(raw['IONGAUGEPRESSURE'], -20, 20) * 0.3 + 0.4); // 중간 배치
+    
+    seriesEBV.shift();
+    seriesEBV.push(autoNormalize(raw['ETCHBEAMVOLTAGE'], 0, 150) * 0.3 + 0.1); // 아래쪽 배치
+    
+    seriesEBC.shift();
+    seriesEBC.push(autoNormalize(raw['ETCHBEAMCURRENT'], 0, 150) * 0.2 + 0.05); // 맨 아래 배치
 
     drawChart();
 
