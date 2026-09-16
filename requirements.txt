@@ -8,3 +8,11 @@ langchain-ollama
 langchain-community
 python-dotenv
 oracledb
+torch
+tqdm
+joblib
+scipy
+optuna
+fastapi
+uvicorn
+websockets
