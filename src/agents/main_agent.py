@@ -3,8 +3,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from src.agents.graph_state import AgentState
 
 class MainAgent:
-    def __init__(self, model_name="qwen2.5:7b"): # 로컬 Qwen 모델 지정
-        # Ollama 서버(보통 localhost:11434)와 통신하는 랭체인 객체
+    def __init__(self, model_name="qwen2.5:1.5b"): # 경량 로컬 Qwen 모델 지정 (VRAM/RAM < 1.5GB)
+        # Ollama 서버(localhost:11434)와 통신하는 랭체인 객체
         self.llm = ChatOllama(model=model_name, temperature=0.1)
         
     def generate_action_report(self, state: AgentState) -> dict:

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko" class="h-full">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>ATR Oculus - ATR Sensor Telemetry Studio</title>
+ <script src="https://cdn.tailwindcss.com"></script>
+ <script>
+ tailwind.config = {
+ theme: {
+ extend: {
+ fontFamily: {
+ sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+ mono: ['Menlo', 'Monaco', 'Consolas', 'monospace']
+ },
+ colors: {
+ industrial: {
+ 50: '#F8F9FA',
+ 100: '#F1F3F5',
+ 200: '#E9ECEF',
+ 300: '#DEE2E6',
+ 400: '#CED4DA',
+ 500: '#ADB5BD',
+ 600: '#868E96',
+ 700: '#495057',
+ 800: '#343A40',
+ 900: '#212529',
+ }
+ }
+ }
+ }
+ }
+ </script>
+ <!-- Lucide Icons -->
+ <script src="https://unpkg.com/lucide@latest"></script>
+ <style>
+ ::-webkit-scrollbar {
+ width: 5px;
+ height: 5px;
+ }
+ ::-webkit-scrollbar-track {
+ background: transparent;
+ }
+ ::-webkit-scrollbar-thumb {
+ background: rgba(156, 163, 175, 0.4);
+ border-radius: 9999px;
+ }
+ ::-webkit-scrollbar-thumb:hover {
+ background: rgba(107, 114, 128, 0.7);
+ }
+ .drag-over-active {
+ border-color: #2563EB !important;
+ background-color: rgba(239, 246, 255, 0.8) !important;
+ }
+ .sensor-drag-item:active {
+ cursor: grabbing;
+ opacity: 0.6;
+ }
+ </style>
+</head>
+<body class="bg-[#F8F9FA] text-industrial-900 h-screen flex flex-col font-sans antialiased select-none overflow-hidden selection:bg-industrial-200 selection:text-industrial-900">
+
+ <!-- 1. Top Control Bar (ATR Sensor Layout & Stream Controller) -->
+ <header class="h-13 bg-white border-b border-industrial-200 px-4 flex items-center justify-between z-20 flex-shrink-0 shadow-xs">
+ 
+ <!-- Left: Navigation & Branding -->
+ <div class="flex items-center space-x-3">
+ <a href="/" class="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-industrial-700 bg-industrial-100 hover:bg-industrial-200 border border-industrial-300 rounded transition-colors" title="메인 오퍼레이터 대시보드로 복귀">
+ <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-industrial-600"></i>
+ <span>오퍼레이터 대시보드</span>
+ </a>
+
+ <div class="h-4 w-px bg-industrial-200 mx-1"></div>
+
+ <div class="flex items-center space-x-2">
+ <span class="px-1.5 py-0.5 rounded border border-industrial-300 bg-industrial-100 text-industrial-800 text-xs font-bold font-mono">PJ</span>
+ <span class="font-bold text-sm text-industrial-900 tracking-tight">Telemetry Studio</span>
+ <span class="text-[11px] text-industrial-500 font-mono hidden md:inline-block">Fab 04 Node 84-Alpha</span>
+ </div>
+ </div>
+
+ <!-- Center: Layout Configuration Presets -->
+ <div class="flex items-center space-x-1.5 bg-industrial-50 p-1 rounded-lg border border-industrial-200">
+ <span class="text-[11px] font-medium text-industrial-500 px-1.5 hidden sm:inline">레이아웃:</span>
+ 
+ <button id="layout-1x1" class="layout-btn px-2 py-1 text-xs font-semibold rounded transition-colors bg-white text-industrial-900 border border-industrial-300 shadow-xs" data-layout="1x1" title="1x1 단일 플롯">
+ 1×1
+ </button>
+ <button id="layout-1x2" class="layout-btn px-2 py-1 text-xs font-medium rounded transition-colors text-industrial-600 hover:text-industrial-900 hover:bg-white border border-transparent" data-layout="1x2" title="가로 2단 분할">
+ 1×2
+ </button>
+ <button id="layout-2x1" class="layout-btn px-2 py-1 text-xs font-medium rounded transition-colors text-industrial-600 hover:text-industrial-900 hover:bg-white border border-transparent" data-layout="2x1" title="세로 2열 분할">
+ 2×1
+ </button>
+ <button id="layout-2x2" class="layout-btn px-2 py-1 text-xs font-medium rounded transition-colors text-industrial-600 hover:text-industrial-900 hover:bg-white border border-transparent" data-layout="2x2" title="2x2 4분할 그리드">
+ 2×2
+ </button>
+ <button id="layout-3x1" class="layout-btn px-2 py-1 text-xs font-medium rounded transition-colors text-industrial-600 hover:text-industrial-900 hover:bg-white border border-transparent" data-layout="3x1" title="3행 스택 분할">
+ 3×1
+ </button>
+
+ <div class="h-3 w-px bg-industrial-200 mx-0.5"></div>
+
+ <button id="add-plot-btn" class="inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold text-industrial-700 hover:text-industrial-900 hover:bg-white rounded transition-colors border border-transparent" title="새 플롯 창 추가">
+ <i data-lucide="plus" class="w-3.5 h-3.5 text-industrial-600"></i>
+ <span>플롯 추가</span>
+ </button>
+ </div>
+
+ <!-- Right: Time Window, Pause & Live Stream Status -->
+ <div class="flex items-center space-x-3">
+ <!-- Time Range Select -->
+ <div class="flex items-center space-x-1 text-xs font-mono">
+ <span class="text-[11px] text-industrial-500 mr-1 hidden lg:inline">윈도우:</span>
+ <select id="time-window-select" class="bg-industrial-100 hover:bg-industrial-200 text-industrial-800 border border-industrial-300 rounded px-2 py-1 text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-industrial-400 cursor-pointer">
+ <option value="30">30초 (60 pt)</option>
+ <option value="60" selected>60초 (120 pt)</option>
+ <option value="120">120초 (240 pt)</option>
+ <option value="300">300초 (600 pt)</option>
+ </select>
+ </div>
+
+ <!-- Pause / Resume Toggle Button -->
+ <button id="pause-stream-btn" class="inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-industrial-700 bg-industrial-100 hover:bg-industrial-200 border border-industrial-300 rounded transition-colors shadow-xs">
+ <i data-lucide="pause" id="pause-icon" class="w-3.5 h-3.5 text-industrial-600"></i>
+ <span id="pause-text">일시정지</span>
+ </button>
+
+ <!-- Live Indicator -->
+ <div class="inline-flex items-center px-2 py-1 rounded text-[11px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+ <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+ <span id="studio-stream-status">LIVE 2Hz</span>
+ </div>
+ </div>
+
+ </header>
+
+ <!-- 2. Main Studio Body (Explorer Sidebar + Plot Workspace) -->
+ <div class="flex-1 flex overflow-hidden">
+ 
+ <!-- LEFT SIDEBAR: Sensor Stream Explorer -->
+ <aside class="w-72 bg-white border-r border-industrial-200 flex flex-col flex-shrink-0 z-10">
+ 
+ <!-- Explorer Header & Search Filter -->
+ <div class="p-3 border-b border-industrial-100 space-y-2.5">
+ <div class="flex items-center justify-between">
+ <div class="flex items-center space-x-1.5">
+ <i data-lucide="list-tree" class="w-3.5 h-3.5 text-industrial-600"></i>
+ <span class="text-xs font-bold text-industrial-800">센서 스트림 (17 채널)</span>
+ </div>
+ <span class="text-[10px] text-industrial-500 font-mono" id="sensor-count-badge">17/17</span>
+ </div>
+
+ <!-- Search Input -->
+ <div class="relative">
+ <input 
+ id="sensor-search-input" 
+ type="text" 
+ placeholder="센서 검색 (예: BEAM, FLOW...)" 
+ class="w-full pl-7 pr-2.5 py-1 text-xs rounded border border-industrial-200 bg-industrial-50 text-industrial-900 placeholder-industrial-400 focus:outline-none focus:border-industrial-400 focus:ring-1 focus:ring-industrial-400 font-mono"
+ >
+ <i data-lucide="search" class="w-3.5 h-3.5 text-industrial-400 absolute left-2 top-2"></i>
+ </div>
+
+ <!-- Group Filter Tabs -->
+ <div class="flex space-x-1 text-[11px] font-medium border-b border-industrial-100 pb-1">
+ <button class="filter-tab px-1.5 py-0.5 rounded text-industrial-900 font-bold bg-industrial-100" data-group="all">전체</button>
+ <button class="filter-tab px-1.5 py-0.5 rounded text-industrial-500 hover:text-industrial-900" data-group="beam">전압/전류</button>
+ <button class="filter-tab px-1.5 py-0.5 rounded text-industrial-500 hover:text-industrial-900" data-group="flow">유량/압력</button>
+ <button class="filter-tab px-1.5 py-0.5 rounded text-industrial-500 hover:text-industrial-900" data-group="mech">기구부</button>
+ </div>
+ </div>
+
+ <!-- Sensor List (Draggable Items) -->
+ <div id="sensor-list-container" class="flex-1 overflow-y-auto p-2 space-y-1">
+ <!-- JS dynamically populates draggable sensor items -->
+ </div>
+
+ <!-- Left Bottom Instruction Guide -->
+ <div class="p-3 bg-industrial-50 border-t border-industrial-200 text-[11px] text-industrial-600 leading-relaxed font-sans">
+ <p class="font-semibold text-industrial-800 mb-1 flex items-center space-x-1">
+ <i data-lucide="info" class="w-3 h-3 text-industrial-500"></i>
+ <span>ATR Sensor 조작 가이드</span>
+ </p>
+ <ul class="space-y-0.5 text-[10.5px] text-industrial-500 list-disc list-inside">
+ <li>센서를 끌어다 원하는 플롯 창에 드롭하세요.</li>
+ <li>플롯 헤더의 <strong>[+ 센서]</strong>로도 즉시 할당 가능합니다.</li>
+ <li>차트 위 마우스 오버 시 시간축 커서가 동기화됩니다.</li>
+ </ul>
+ </div>
+
+ </aside>
+
+ <!-- RIGHT MAIN WORKSPACE: Dynamic Subplot Grid -->
+ <main class="flex-1 p-3 overflow-hidden flex flex-col bg-industrial-100/60">
+ 
+ <!-- Subplots Container (Grid dynamically updated by layout) -->
+ <div id="plots-grid-container" class="flex-1 grid gap-3 w-full h-full overflow-hidden">
+ <!-- JS dynamically renders plot cards here -->
+ </div>
+
+ </main>
+
+ </div>
+
+ <!-- Synchronized Crosshair Tooltip Float -->
+ <div id="crosshair-tooltip" class="fixed pointer-events-none z-50 hidden bg-white border border-industrial-300 shadow-md rounded-md p-2 text-xs font-mono text-industrial-900 whitespace-nowrap">
+ </div>
+
+ <!-- Fast Modal for Adding Sensor to a specific Plot -->
+ <div id="add-sensor-modal" class="fixed inset-0 z-50 hidden bg-black/20 flex items-center justify-center p-4">
+ <div class="bg-white border border-industrial-300 rounded-xl shadow-xl w-full max-w-sm p-4 space-y-3">
+ <div class="flex items-center justify-between pb-2 border-b border-industrial-200">
+ <h3 class="text-xs font-bold text-industrial-900" id="modal-plot-title">플롯에 센서 추가</h3>
+ <button id="close-sensor-modal-btn" class="text-industrial-400 hover:text-industrial-700 p-1">
+ <i data-lucide="x" class="w-4 h-4"></i>
+ </button>
+ </div>
+ <div id="modal-sensor-list" class="max-h-60 overflow-y-auto space-y-1 pr-1">
+ <!-- Populated dynamically -->
+ </div>
+ </div>
+ </div>
+
+ <script src="/static/sensor_studio.js"></script>
+</body>
+</html>

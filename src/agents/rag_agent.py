@@ -1,15 +1,11 @@
 import pandas as pd
 import numpy as np
 import os
-import oracledb
-from dotenv import load_dotenv
+import sqlite3
 
 class OracleRAGAgent:
     def __init__(self):
-        load_dotenv()
-        self.user = os.getenv("ORACLE_USER")
-        self.password = os.getenv("ORACLE_PASSWORD")
-        self.dsn = os.getenv("ORACLE_DSN")
+        self.db_path = "factory_logs.db"
         
         # 17개의 핵심 센서 리스트 (PHM 2018 기반)
         self.features = [
@@ -22,9 +18,7 @@ class OracleRAGAgent:
         ]
         
     def get_connection(self):
-        if not all([self.user, self.password, self.dsn]):
-            raise ValueError("Oracle DB connection info is missing in .env")
-        return oracledb.connect(user=self.user, password=self.password, dsn=self.dsn)
+        return sqlite3.connect(self.db_path)
         
     def search_similar_pattern(self, anomaly_data: pd.DataFrame):
         """
@@ -33,30 +27,33 @@ class OracleRAGAgent:
         # 현재 이상 데이터 윈도우의 17개 센서 평균값 도출
         target_values = []
         for feat in self.features:
-            # 안전하게 처리 (해당 컬럼이 없는 경우 대비)
-            val = anomaly_data[feat].mean() if feat in anomaly_data.columns else 0.0
+            val = float(anomaly_data[feat].mean()) if feat in anomaly_data.columns else 0.0
             target_values.append(val)
         
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             
-            # 동적으로 다차원(17차원) 유클리드 거리 쿼리 생성
+            # 동적으로 다차원(17차원) 거리 쿼리 생성 (SQLite 지원 형태)
             distance_terms = []
             for i, feat in enumerate(self.features):
-                distance_terms.append(f"POWER({feat} - :{i+1}, 2)")
+                distance_terms.append(f"(({feat} - ?) * ({feat} - ?))")
             
             distance_calc = " + ".join(distance_terms)
             
-            # Oracle 12c 이상 문법 (FETCH FIRST 1 ROWS ONLY)
             query = f"""
             SELECT id, pattern_desc, cause, action_taken, success_rate 
             FROM maintenance_history 
             ORDER BY {distance_calc} ASC
-            FETCH FIRST 1 ROWS ONLY
+            LIMIT 1
             """
             
-            cursor.execute(query, tuple(target_values))
+            # 각각의 ? 에 맵핑하기 위해 값을 2번씩 반복
+            query_params = []
+            for val in target_values:
+                query_params.extend([val, val])
+                
+            cursor.execute(query, tuple(query_params))
             row = cursor.fetchone()
             
             if row:
@@ -78,7 +75,7 @@ class OracleRAGAgent:
                 "id": -1,
                 "pattern_desc": "Fallback (DB Connection Failed)",
                 "cause": "Unknown Database Error",
-                "action": "Check Oracle DB Connection",
+                "action": "Check DB Connection",
                 "success_rate": 0.0
             }
         finally:

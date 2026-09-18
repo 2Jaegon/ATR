@@ -131,16 +131,23 @@ class DetectionAgent:
             embed_dim=8, hidden_dim=32, num_layers=2
         ).to(self.device)
 
-        try:
-            self.model_tr.load_state_dict(torch.load(
-                os.path.join(self.weights_dir, "tr_ae.pt"), map_location=self.device))
-            self.model_gnn.load_state_dict(torch.load(
-                os.path.join(self.weights_dir, "st_gnn.pt"), map_location=self.device))
-            self.model_lstm.load_state_dict(torch.load(
-                os.path.join(self.weights_dir, "lstm_ae.pt"), map_location=self.device))
-            print("[DetectionAgent] PyTorch 가중치(.pt) 3종 로드 완료.")
-        except Exception as e:
-            print(f"[DetectionAgent] 가중치 로드 실패: {e}")
+        loaded = []
+        for name, model, fname in [
+            ("TR-AE", self.model_tr, "tr_ae.pt"),
+            ("ST-GNN", self.model_gnn, "st_gnn.pt"),
+            ("LSTM-AE", self.model_lstm, "lstm_ae.pt")
+        ]:
+            path = os.path.join(self.weights_dir, fname)
+            if os.path.exists(path):
+                try:
+                    model.load_state_dict(torch.load(path, map_location=self.device))
+                    loaded.append(name)
+                except Exception as e:
+                    print(f"[DetectionAgent] {name} 로드 에러: {e}")
+            else:
+                print(f"[DetectionAgent] {name} 가중치 없음 ({fname}) - 학습 대기 상태")
+
+        print(f"[DetectionAgent] PyTorch 가중치 로드 완료: {len(loaded)}/3 ({', '.join(loaded)})")
 
         self.is_loaded = True
 

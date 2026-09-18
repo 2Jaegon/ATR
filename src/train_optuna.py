@@ -519,9 +519,9 @@ def main():
     if device.type == 'cuda':
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_mem / 1e9
-        print(f"\n🎮 GPU 감지: {gpu_name} ({gpu_mem:.1f} GB)")
+        print(f"\n[GPU] GPU 감지: {gpu_name} ({gpu_mem:.1f} GB)")
     else:
-        print("\n⚠️ GPU 미감지. CPU로 실행합니다. (매우 느림)")
+        print("\n[Warning] GPU 미감지. CPU로 실행합니다. (매우 느림)")
 
     # 메타 데이터 로드
     meta_path = os.path.join(CACHE_DIR, "meta.pt")
@@ -530,7 +530,7 @@ def main():
         return
     meta = torch.load(meta_path, weights_only=False)
 
-    print(f"\n📊 데이터셋 정보:")
+    print(f"\n[Data] 데이터셋 정보:")
     print(f"   센서 변수: {meta['num_sensor_features']}개")
     print(f"   recipe_step: {meta['num_recipe_steps']}종")
     print(f"   recipe: {meta['num_recipes']}종")
@@ -686,7 +686,7 @@ def main():
     summary_path = os.path.join(WEIGHTS_DIR, "best_params.json")
     with open(summary_path, 'w', encoding='utf-8') as f:
         json.dump(best_params_all, f, indent=2, ensure_ascii=False)
-    print(f"\n📋 최적 파라미터 요약 저장: {summary_path}")
+    print(f"\n[Summary] 최적 파라미터 요약 저장: {summary_path}")
 
     print("\n" + "=" * 60)
     print("  하이퍼파라미터 튜닝 완료!")

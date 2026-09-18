@@ -1,454 +1,261 @@
 <!DOCTYPE html>
 <html lang="ko" class="h-full">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATR Oculus - 오퍼레이터 대시보드</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Pretendard"', 'system-ui', 'sans-serif'],
-            mono: ['"SF Mono"', 'ui-monospace', 'Menlo', 'Monaco', 'Consolas', 'monospace']
-          },
-          colors: {
-            apple: {
-              gray: '#F5F5F7',
-              border: '#E5E5EA',
-              darkBg: '#0A0A0C',
-              darkCard: '#16161A',
-              darkBorder: '#27272A'
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATR Oculus - 오퍼레이터 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                        mono: ['Menlo', 'Monaco', 'Consolas', 'monospace']
+                    },
+                    colors: {
+                        industrial: {
+                            50: '#F8F9FA', 100: '#F1F3F5', 200: '#E9ECEF', 300: '#DEE2E6',
+                            400: '#CED4DA', 500: '#ADB5BD', 600: '#868E96', 700: '#495057',
+                            800: '#343A40', 900: '#212529',
+                        }
+                    }
+                }
             }
-          }
         }
-      }
-    }
-  </script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    /* Custom scrollbar styling for sleek Apple finish */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(156, 163, 175, 0.4);
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(107, 114, 128, 0.7);
-    }
-  </style>
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.7); }
+    </style>
 </head>
-<body class="bg-[#FBFBFD] dark:bg-[#0D0D11] text-[#1D1D1F] dark:text-[#F5F5F7] min-h-full font-sans antialiased transition-colors duration-200 flex flex-col selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
+<body class="bg-industrial-50 text-industrial-900 h-screen overflow-hidden font-sans antialiased flex flex-col selection:bg-industrial-200 selection:text-industrial-900">
 
-  <!-- 1. Top Header -->
-  <header class="sticky top-0 z-30 border-b border-[#E5E5EA] dark:border-[#23232A] bg-[#FBFBFD]/80 dark:bg-[#0D0D11]/80 backdrop-blur-md transition-colors duration-200">
-    <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
-      
-      <!-- Brand & Facility context -->
-      <div class="flex items-center space-x-5">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-xl bg-black dark:bg-white flex items-center justify-center text-white dark:text-black shadow-sm font-semibold text-sm tracking-tight">
-            <span>Ω</span>
-          </div>
-          <span class="font-semibold text-lg tracking-tight text-black dark:text-white">ATR Oculus</span>
-        </div>
-        <span class="hidden sm:inline-block text-xs font-medium text-gray-400 dark:text-gray-500 border-l border-gray-300 dark:border-gray-700 pl-4">
-          현장 오퍼레이터 콘솔 · Fab 04 플라즈마 에칭 공정
-        </span>
-      </div>
-
-      <!-- Center / Status Indicator -->
-      <div class="flex items-center space-x-4">
-        <div id="global-status-indicator" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 shadow-sm transition-all">
-          <span class="relative flex h-2 w-2 mr-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span class="font-medium">장비 상태: 정상 가동 (Nominal)</span>
-        </div>
-
-        <div class="hidden md:flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 font-mono">
-          <span class="bg-gray-100 dark:bg-gray-800/80 px-2 py-1 rounded border border-gray-200/70 dark:border-gray-700/60">Node 84-Alpha</span>
-          <span class="bg-gray-100 dark:bg-gray-800/80 px-2 py-1 rounded border border-gray-200/70 dark:border-gray-700/60">VAC: 1.42×10⁻⁶ Torr</span>
-        </div>
-      </div>
-
-      <!-- Right Actions: Dark mode toggle & Admin Link -->
-      <div class="flex items-center space-x-3">
-        <!-- Dark Mode Toggle Button -->
-        <button id="themeToggleBtn" type="button" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-[#1A1A22] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/80 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600">
-          <i id="themeIcon" data-lucide="moon" class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400"></i>
-          <span id="themeToggleText">Dark</span>
-        </button>
-
-        <!-- Admin Page Link -->
-        <a href="/admin" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
-          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-          <span>관리자</span>
-        </a>
-      </div>
-
-    </div>
-  </header>
-
-  <!-- Main Content Layout -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto p-6 space-y-6">
-
-    <!-- KPI Summary Row for Field Operators -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
-        <div>
-          <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">챔버 진공도</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">1.42×10⁻⁶ <span class="text-xs font-normal text-gray-400 font-sans">Torr</span></div>
-        </div>
-        <div class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs">
-          <i data-lucide="gauge" class="w-4 h-4"></i>
-        </div>
-      </div>
-      <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
-        <div>
-          <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">웨이퍼 스테이지 온도</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">312.4 <span class="text-xs font-normal text-gray-400 font-sans">°C</span></div>
-        </div>
-        <div class="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs">
-          <i data-lucide="thermometer" class="w-4 h-4"></i>
-        </div>
-      </div>
-      <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
-        <div>
-          <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">플라즈마 RF 주파수</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">13.56 <span class="text-xs font-normal text-gray-400 font-sans">MHz</span></div>
-        </div>
-        <div class="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xs">
-          <i data-lucide="activity" class="w-4 h-4"></i>
-        </div>
-      </div>
-      <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
-        <div>
-          <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">예상 잔여 수명 (RUL)</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-emerald-600 dark:text-emerald-400">> 1,420 <span class="text-xs font-normal text-gray-400 font-sans">시간</span></div>
-        </div>
-        <div class="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs">
-          <i data-lucide="clock" class="w-4 h-4"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Grid: Left (2/3) & Right (1/3) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-      <!-- LEFT COLUMN (2/3 width -> col-span-8) -->
-      <section class="lg:col-span-8 space-y-6">
-
-        <!-- Top: Real-time Sensor Monitoring Chart Area -->
-        <div class="bg-white dark:bg-[#16161C] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-gray-100 dark:border-gray-800/70 gap-3">
-            <div>
-              <div class="flex items-center space-x-2">
-                <h2 class="text-base font-semibold tracking-tight text-gray-900 dark:text-white">실시간 센서 모니터링</h2>
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/50">
-                  LIVE 60Hz
-                </span>
-              </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">챔버 3차 다중 스트림 임피던스 및 진동 파형 연속 계측</p>
+    <!-- Top Header (Full Width) -->
+    <header class="w-full h-14 shrink-0 border-b border-industrial-200 bg-white flex items-center justify-between px-4 z-20 shadow-sm relative">
+        <!-- Left: Brand -->
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 pl-1">
+                <div class="px-2 py-0.5 rounded border border-industrial-300 bg-industrial-100 text-industrial-800 text-xs font-bold font-mono">ATR</div>
+                <span class="font-bold text-sm tracking-tight text-industrial-900">Oculus Console</span>
             </div>
-
-            <!-- Legend & Controls -->
-            <div class="flex items-center space-x-4 text-xs font-medium">
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#10B981]"></span>
-                <span>FLOWCOOL_PR</span>
-              </div>
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
-                <span>IONGAUGE_PR</span>
-              </div>
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
-                <span>ETCHBEAM_V</span>
-              </div>
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#8B5CF6]"></span>
-                <span>ETCHBEAM_I</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Chart Area -->
-          <div class="relative w-full h-[320px] mt-4 bg-gray-50/60 dark:bg-[#0F0F14]/70 rounded-xl p-3 border border-gray-100 dark:border-gray-800/50 overflow-hidden flex flex-col justify-between">
-            
-            <!-- Canvas for custom sensor simulation -->
-            <canvas id="sensorChart" class="w-full h-full block"></canvas>
-
-            <!-- Bottom chart micro-stats -->
-            <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-[#16161C]/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-gray-200/60 dark:border-gray-800/60 font-mono pointer-events-none">
-              <span>관측 윈도우: T-60s → T-0s</span>
-              <span class="text-emerald-600 dark:text-emerald-400 font-medium">노이즈 편차: ±0.012 µm (정상 허용 범위 내)</span>
-              <span>샘플링 속도: 250 Hz</span>
-            </div>
-          </div>
-
-          <!-- Sensor Secondary Indicators -->
-          <div class="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/70 text-center">
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">평균 오차율</span>
-              <p class="text-sm font-semibold font-mono text-gray-800 dark:text-gray-200 mt-0.5">0.014 µm</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">고조파 왜곡률</span>
-              <p class="text-sm font-semibold font-mono text-gray-800 dark:text-gray-200 mt-0.5">0.82 dB</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">서브스트레이트 틸트</span>
-              <p class="text-sm font-semibold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">0.003°</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom: Alert Timeline Section -->
-        <div class="bg-white dark:bg-[#16161C] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-sm">
-          <div class="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800/70">
-            <div>
-              <h2 class="text-base font-semibold tracking-tight text-gray-900 dark:text-white">이상 탐지 로그</h2>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">실시간 센서 트리거 및 장비 이벤트 타임라인</p>
-            </div>
-            <div class="flex items-center space-x-2 text-xs">
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 정상
-              </span>
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400 ml-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span> 주의
-              </span>
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400 ml-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> 위험
-              </span>
-            </div>
-          </div>
-
-          <!-- Alert Log Container (Scrollable) -->
-          <div id="alert-log" class="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
-            
-            <!-- Alert Item 1 (Warning / Amber) -->
-            <div class="p-3.5 rounded-xl bg-amber-50/40 dark:bg-amber-950/20 border-l-4 border-l-amber-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-amber-50/70 dark:hover:bg-amber-950/30">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
-                    주의 · WARNING
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">가스 유량 미세 드리프트 감지</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">14:28:15 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                MFC-3 유량 컨트롤러 질량 유속 +1.8 sccm 편차 발생. 허용 임계치(2.0 sccm) 근접 중. 다음 웨이퍼 배치 전 퍼지 권장.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: MFC-3_GasFlow</span>
-                <span>웨이퍼 ID: #W-8942</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 2 (Normal / Green) -->
-            <div class="p-3.5 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/15 border-l-4 border-l-emerald-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                    정상 · NORMAL
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">RF 정합 네트워크 자동 교정 완료</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">14:15:02 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                가변 커패시터 C14 바이어스 전압 리밸런싱 완료. 임피던스 매칭 위상각 0.02 rad 이내 안정화.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: RF_Match_C14</span>
-                <span>작업자: 자동 시스템</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 3 (Critical / Red) -->
-            <div class="p-3.5 rounded-xl bg-rose-50/30 dark:bg-rose-950/15 border-l-4 border-l-rose-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-rose-50/60 dark:hover:bg-rose-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300">
-                    임계 알람 이력
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">챔버 도어 진공 실링 압력 일시 감압</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">13:42:19 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                진공 게이트 밸브 밀폐 압력 순간 강하(0.15초) 감지 후 즉시 복구됨. O-링 마모도 점검 필요.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: VLV_Gate_P</span>
-                <span>조치: 밸브 체결 확인 완료</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 4 (Normal / Green) -->
-            <div class="p-3.5 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/15 border-l-4 border-l-emerald-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                    정상 · NORMAL
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">웨이퍼 척 정전기 흡착압 정상 유지</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">12:55:40 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                ESC (Electrostatic Chuck) 헬륨 냉각 배면압 12.4 Torr 정밀 유지 확인.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: ESC_He_BackPressure</span>
-                <span>상태: 최적</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-      </section>
-
-      <!-- RIGHT COLUMN (1/3 width -> col-span-4) -->
-      <section class="lg:col-span-4 space-y-6">
-
-        <!-- Top: Action Report Section -->
-        <div class="bg-white dark:bg-[#16161C] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-sm">
-          <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800/70">
-            <div>
-              <h2 class="text-base font-semibold tracking-tight text-gray-900 dark:text-white">액션 리포트</h2>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">표준운영절차(SOP) 기반 권장 정비 지침</p>
-            </div>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-              SOP v7.2
+            <span class="hidden sm:inline-block text-xs font-semibold text-industrial-500 border-l border-industrial-200 pl-3 ml-1">
+                Fab 04 Plasma Etch
             </span>
-          </div>
+        </div>
 
-          <!-- RAG Console (Scrollable Div) -->
-          <div id="rag-console" class="mt-4 p-4 rounded-xl bg-gray-50/80 dark:bg-[#111116] border border-gray-200/60 dark:border-gray-800/70 text-xs font-mono max-h-[300px] overflow-y-auto space-y-3">
+        <!-- Center: Status -->
+        <div class="absolute left-1/2 -translate-x-1/2">
+            <div id="global-status-indicator" class="inline-flex items-center px-3 py-1 rounded-sm text-xs font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+                <span class="w-2 h-2 mr-2 rounded-full bg-green-500"></span>
+                <span>SYSTEM NOMINAL</span>
+            </div>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="flex items-center space-x-4">
+            <div class="hidden md:flex items-center space-x-3 text-xs text-industrial-600 font-mono">
+                <span class="bg-industrial-50 px-2 py-0.5 border border-industrial-200 rounded">Node: 84-Alpha</span>
+                <span class="bg-industrial-50 px-2 py-0.5 border border-industrial-200 rounded">VAC: 1.42e-6 Torr</span>
+            </div>
+            <a href="/admin" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-industrial-600 hover:text-industrial-900 bg-industrial-50 hover:bg-industrial-100 border border-industrial-200 transition-colors rounded">
+                <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+                <span>관리자 패널</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Content Area (Sidebar + Main) -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Sidebar -->
+        <aside id="app-sidebar" class="flex-shrink-0 border-r border-industrial-200 bg-white transition-all duration-300 ease-in-out overflow-hidden flex flex-col z-10 h-full" style="width: 20rem;">
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+<!-- Top: Action Report History Section -->
+ <div class="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-sm flex flex-col h-[400px]">
+ <div class="flex items-center justify-between pb-3 border-b border-gray-100 ">
+ <div>
+ <h2 class="text-base font-semibold tracking-tight text-gray-900 ">액션 리포트 히스토리</h2>
+ <p class="text-xs text-gray-500 mt-0.5">이상 패턴 기반 종합 분석 기록</p>
+ </div>
+ <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 ">SOP v7.2</span>
+ </div>
+
+ <!-- Report List -->
+ <div id="report-history-list" class="flex-1 overflow-y-auto mt-2 space-y-2 pr-1">
+ <div id="report-list-empty" class="py-12 text-center text-xs text-industrial-400 font-mono">생성된 리포트 없음</div>
+ </div>
+
+ <!-- Download Button -->
+ <div class="pt-3 border-t border-gray-100 mt-3">
+ <button id="download-selected-reports-btn" type="button" class="w-full inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
+ <i data-lucide="download-cloud" class="w-3.5 h-3.5 text-white"></i>
+ <span>선택 항목 다운로드 (PDF)</span>
+ </button>
+ </div>
+ </div>
+<!-- Bottom: Maintenance Report Upload Section -->
+ <div class="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-sm">
+ <div class="pb-3 border-b border-gray-100 ">
+ <h2 class="text-base font-semibold tracking-tight text-gray-900 ">정비 리포트 업로드</h2>
+ <p class="text-xs text-gray-500 mt-0.5">현장 점검 일지 및 부품 교체 기록 등록</p>
+ </div>
+
+ <!-- File Drop Zone Div with Dashed Border -->
+ <div class="mt-4">
+ <div id="dropZone" class="relative group cursor-pointer border-2 border-dashed border-gray-300 hover:border-gray-400 :border-gray-500 rounded-xl p-6 transition-colors text-center bg-gray-50/50 ">
+ <input id="file-upload-input" type="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.xlsx,.png,.jpg">
+ 
+ <div class="flex flex-col items-center justify-center space-y-2">
+ <div class="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500 group-hover:scale-105 transition-transform shadow-sm">
+ <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+ </div>
+ <div class="text-xs font-medium text-gray-700 ">
+ <span class="text-blue-600 font-semibold underline underline-offset-2">파일을 선택하거나</span> 여기에 끌어다 놓으세요
+ </div>
+ <p id="file-name-display" class="text-[11px] text-gray-400 font-mono">
+ PDF, XLSX, DOCX (최대 25MB)
+ </p>
+ </div>
+ </div>
+ </div>
+
+ <!-- Operator Quick Notes (Field Usability) -->
+ <div class="mt-3">
+ <input type="text" placeholder="점검 요약 메모 (예: O-링 그리스 도포 완료)" class="w-full px-3 py-2 text-xs rounded-lg bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-industrial-400 focus:border-industrial-400">
+ </div>
+
+ <!-- Submit Button -->
+ <div class="mt-4">
+ <button id="upload-btn" type="button" class="w-full inline-flex items-center justify-center space-x-2 py-2.5 px-4 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+ <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+ <span>업로드</span>
+ </button>
+ </div>
+
+ </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <div class="flex-1 flex flex-col min-w-0 bg-gray-50/30 overflow-y-auto relative h-full">
+            <main class="flex-1 p-6">
+                <div class="max-w-[1400px] mx-auto space-y-6">
+
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        <section class="lg:col-span-8 space-y-6 flex flex-col">
+<!-- Top: Real-time Sensor Monitoring Chart Area -->
+ <div class="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-sm">
+ <!-- Chart Header: Title & Advanced Sensor Studio Detail Link -->
+ <div class="flex items-center justify-between pb-3 mb-2.5 border-b border-gray-100">
+ <div class="flex items-center space-x-2">
+ <h2 class="text-sm font-semibold text-industrial-900 tracking-tight">실시간 센서 모니터링 (FDC)</h2>
+ <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-industrial-100 text-industrial-600 border border-industrial-200">17 Channels Active</span>
+ </div>
+ <a href="/studio" class="inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-industrial-700 bg-industrial-100 hover:bg-industrial-200 border border-industrial-300 rounded-md transition-colors shadow-sm">
+ <i data-lucide="layout-grid" class="w-3.5 h-3.5 text-industrial-600"></i>
+ <span>상세 보기 (Advanced Sensor Studio)</span>
+ <i data-lucide="arrow-right" class="w-3 h-3 text-industrial-500"></i>
+ </a>
+ </div>
+
+ <!-- Top Toolbar: 17 Sensor Dynamic Toggles (Full Width) -->
+ <div class="pb-2.5 border-b border-gray-100">
+ <div id="sensor-legend-container" class="flex flex-wrap items-center gap-1.5 w-full justify-start">
+ <!-- JS dynamically injects toggle buttons here -->
+ </div>
+ </div>
+
+ <!-- Chart Area -->
+ <div class="relative w-full h-[520px] mt-3 bg-gray-50/60 rounded-xl p-3 border border-gray-100 overflow-hidden">
+ <!-- Canvas for custom sensor simulation -->
+ <canvas id="sensorChart" class="w-full h-full block"></canvas>
+ </div>
+
+ <!-- Bottom chart micro-stats (Moved below canvas) -->
+ <div class="mt-2.5 flex items-center justify-between text-[11px] text-gray-500 px-2 font-mono">
+ <span id="chart-window-status">관측 시간: 0s / 60s</span>
+ <span class="text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 ">노이즈 편차: ±0.012 µm (정상 범위)</span>
+ <span>계측 주기: 500ms (2 Hz)</span>
+ </div>
+
+ <!-- Sensor Secondary Indicators -->
+ <div class="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100 text-center">
+ <div class="p-2.5 rounded-xl bg-gray-50/80 border border-gray-200/50 ">
+ <span class="text-[11px] text-gray-500 ">공정 스텝 (Recipe Step)</span>
+ <p id="sub-recipe-step" class="text-sm font-semibold font-mono text-gray-800 mt-0.5">-</p>
+ </div>
+ <div class="p-2.5 rounded-xl bg-gray-50/80 border border-gray-200/50 ">
+ <span class="text-[11px] text-gray-500 ">앙상블 이상 점수</span>
+ <p id="sub-anomaly-score" class="text-sm font-semibold font-mono text-gray-800 mt-0.5">-</p>
+ </div>
+ <div class="p-2.5 rounded-xl bg-gray-50/80 border border-gray-200/50 ">
+ <span class="text-[11px] text-gray-500 ">서브스트레이트 틸트</span>
+ <p id="sub-tilt-angle" class="text-sm font-semibold font-mono text-emerald-600 mt-0.5">-</p>
+ </div>
+ </div>
+ </div>
+                        </section>
+                        
+<!-- Chat AI Agent Section -->
+    <section class="lg:col-span-4 space-y-6 flex flex-col h-full">
+        <div class="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-sm flex flex-col h-full">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="message-square" class="w-4 h-4 text-industrial-600"></i>
+                    <h2 class="text-sm font-semibold tracking-tight text-gray-900">Qwen RAG Assistant</h2>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100">
+                    Online
+                </span>
+            </div>
             
-            <div class="border-b border-gray-200/70 dark:border-gray-800/80 pb-2">
-              <span class="text-blue-600 dark:text-blue-400 font-semibold">[조회 쿼리]</span>
-              <p class="text-gray-700 dark:text-gray-300 font-sans mt-1">
-                플라즈마 에칭 챔버 MFC-3 유량 드리프트 및 RF 정합 매칭 네트워크 진단
-              </p>
-            </div>
-
-            <div class="space-y-1.5">
-              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">[관련 지침서 도출]</span>
-              <p class="text-gray-600 dark:text-gray-400 font-sans text-[11px] leading-relaxed">
-                • <strong>SOP-SEC-72</strong>: "RF 매칭 네트워크 정전용량 편차 시 C14 가변 캐패시터 유전체 열화 점검 및 CF4 반응 가스 잔류물 세정 절차"<br>
-                • <strong>SOP-SEC-19</strong>: "웨이퍼 교체 시 배치 인터체인지 동안 15분 N2 고속 퍼지 실행 규정"
-              </p>
-            </div>
-
-            <div class="p-2.5 rounded-lg bg-white dark:bg-[#1A1A22] border border-gray-200/80 dark:border-gray-800/80 text-gray-800 dark:text-gray-200 font-sans">
-              <div class="font-semibold text-xs text-gray-900 dark:text-white mb-1 flex items-center space-x-1.5">
-                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-500"></i>
-                <span>현장 엔지니어 권장 행동</span>
-              </div>
-              <ol class="list-decimal list-inside text-[11px] space-y-1 text-gray-600 dark:text-gray-300">
-                <li>차기 웨이퍼(#W-8943) 투입 전 퍼지 사이클 3분 자동 수행 버튼 인가.</li>
-                <li>오후 16:00 정기 점검 시 하부 가스 포트 필터 차압계 육안 확인.</li>
-                <li>긴급 라인 중단 불필요 (현재 안전 한계 82% 여유 보유).</li>
-              </ol>
-            </div>
-
-            <div class="text-[11px] text-gray-400 dark:text-gray-500">
-              분석 완료 시각: 14:30:00 KST · 신뢰 지수: 99.4%
-            </div>
-
-          </div>
-
-          <!-- Download Report Button -->
-          <div class="mt-4">
-            <button id="download-report-btn" type="button" class="w-full inline-flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-xs font-medium text-white bg-[#1D1D1F] hover:bg-black dark:bg-[#F5F5F7] dark:text-[#1D1D1F] dark:hover:bg-white shadow-sm transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 dark:focus:ring-white">
-              <i data-lucide="file-down" class="w-4 h-4"></i>
-              <span>리포트 다운로드 (PDF)</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Bottom: Maintenance Report Upload Section -->
-        <div class="bg-white dark:bg-[#16161C] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-sm">
-          <div class="pb-3 border-b border-gray-100 dark:border-gray-800/70">
-            <h2 class="text-base font-semibold tracking-tight text-gray-900 dark:text-white">정비 리포트 업로드</h2>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">현장 점검 일지 및 부품 교체 기록 등록</p>
-          </div>
-
-          <!-- File Drop Zone Div with Dashed Border -->
-          <div class="mt-4">
-            <div id="dropZone" class="relative group cursor-pointer border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 rounded-xl p-6 transition-colors text-center bg-gray-50/50 dark:bg-[#111116]/50">
-              <input id="file-upload-input" type="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.xlsx,.png,.jpg">
-              
-              <div class="flex flex-col items-center justify-center space-y-2">
-                <div class="w-10 h-10 rounded-full bg-white dark:bg-[#1C1C24] border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:scale-105 transition-transform shadow-sm">
-                  <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+            <!-- Chat Messages -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto py-3 space-y-3 pr-1 text-xs">
+                <div class="flex items-start space-x-2">
+                    <div class="w-6 h-6 rounded bg-industrial-100 border border-industrial-200 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="bot" class="w-3.5 h-3.5 text-industrial-700"></i>
+                    </div>
+                    <div class="bg-industrial-50 rounded-lg rounded-tl-none px-3 py-2 text-[11px] text-industrial-800 border border-industrial-200 max-w-[90%]">
+                        안녕하세요. ATR Oculus AI 어시스턴트입니다. 현재 설비 상태나 조치 이력에 대해 무엇이든 물어보세요.
+                    </div>
                 </div>
-                <div class="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  <span class="text-blue-600 dark:text-blue-400 font-semibold underline underline-offset-2">파일을 선택하거나</span> 여기에 끌어다 놓으세요
-                </div>
-                <p id="file-name-display" class="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
-                  PDF, XLSX, DOCX (최대 25MB)
-                </p>
-              </div>
             </div>
-          </div>
 
-          <!-- Operator Quick Notes (Field Usability) -->
-          <div class="mt-3">
-            <input type="text" placeholder="점검 요약 메모 (예: O-링 그리스 도포 완료)" class="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-[#111116] border border-gray-200 dark:border-gray-700/80 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white">
-          </div>
-
-          <!-- Submit Button -->
-          <div class="mt-4">
-            <button id="upload-btn" type="button" class="w-full inline-flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
-              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-              <span>업로드</span>
-            </button>
-          </div>
-
-          <div class="mt-3 text-[11px] text-center text-gray-400 dark:text-gray-500 flex items-center justify-center space-x-1">
-            <i data-lucide="lock" class="w-3 h-3"></i>
-            <span>클린룸 레벨 5 보안 감사 로그에 자동 동기화됩니다.</span>
-          </div>
-
+            <!-- Chat Input -->
+            <div class="pt-3 border-t border-gray-100 mt-auto">
+                <form id="chat-form" class="flex items-center space-x-2">
+                    <input type="text" id="chat-input" placeholder="질문을 입력하세요..." class="flex-1 px-3 py-1.5 text-xs rounded-lg bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-industrial-400 focus:border-industrial-400" autocomplete="off">
+                    <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    </button>
+                </form>
+            </div>
         </div>
-
-      </section>
-
+    </section>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Footer -->
+            <footer class="border-t border-industrial-200 py-3 px-6 bg-white text-xs text-industrial-500 shrink-0">
+                <div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div class="flex items-center space-x-2 font-mono text-[11px]">
+                        <span>ATR Oculus Core v3.0 (Production)</span>
+                        <span>•</span>
+                        <span>오퍼레이터 터미널 #04</span>
+                    </div>
+                    <div class="text-[11px]">DB Status: Connected (SQLite) | Ingest: Active</div>
+                </div>
+            </footer>
+        </div>
     </div>
-  </main>
 
-  <!-- Clean Minimalist Footer -->
-  <footer class="mt-auto border-t border-gray-200/80 dark:border-gray-800/80 py-4 px-6 bg-white/60 dark:bg-[#0D0D11]/60 text-xs text-gray-400 dark:text-gray-500 transition-colors">
-    <div class="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <div class="flex items-center space-x-2 font-mono text-[11px]">
-        <span>ATR Oculus Core v2.9.4</span>
-        <span>•</span>
-        <span>오퍼레이터 터미널 #04</span>
-        <span>•</span>
-        <span class="text-emerald-600 dark:text-emerald-400">데이터 수집 활성 (Ingesting)</span>
-      </div>
-      <div class="text-[11px]">
-        보안 등급: Level-5 Cleanroom · 무결성 검증 AES-256-GCM
-      </div>
-    </div>
-  </footer>
-
-  <script src="/static/operator_app.js"></script>
+    <script src="/static/operator_app.js"></script>
 </body>
 </html>

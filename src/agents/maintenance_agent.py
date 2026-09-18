@@ -3,7 +3,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from src.agents.graph_state import AgentState
 
 class MaintenanceAgent:
-    def __init__(self, model_name="qwen2.5:7b"):
+    def __init__(self, model_name="qwen2.5:1.5b"): # 경량 로컬 Qwen 모델 지정
         self.llm = ChatOllama(model=model_name, temperature=0) # 평가를 위해 창의성 0
         
     def evaluate_feedback(self, state: AgentState) -> dict:
