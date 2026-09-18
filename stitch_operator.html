@@ -108,7 +108,7 @@
       <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
         <div>
           <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">챔버 진공도</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">1.42×10⁻⁶ <span class="text-xs font-normal text-gray-400 font-sans">Torr</span></div>
+          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white"><span id="kpi-vacuum">1.42×10⁻⁶</span> <span class="text-xs font-normal text-gray-400 font-sans">Torr</span></div>
         </div>
         <div class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs">
           <i data-lucide="gauge" class="w-4 h-4"></i>
@@ -117,7 +117,7 @@
       <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
         <div>
           <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">웨이퍼 스테이지 온도</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">312.4 <span class="text-xs font-normal text-gray-400 font-sans">°C</span></div>
+          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white"><span id="kpi-temp">312.4</span> <span class="text-xs font-normal text-gray-400 font-sans">°C</span></div>
         </div>
         <div class="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs">
           <i data-lucide="thermometer" class="w-4 h-4"></i>
@@ -126,7 +126,7 @@
       <div class="bg-white dark:bg-[#16161C] p-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between">
         <div>
           <div class="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">플라즈마 RF 주파수</div>
-          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white">13.56 <span class="text-xs font-normal text-gray-400 font-sans">MHz</span></div>
+          <div class="text-xl font-semibold mt-1 font-mono text-gray-900 dark:text-white"><span id="kpi-rf">13.56</span> <span class="text-xs font-normal text-gray-400 font-sans">MHz</span></div>
         </div>
         <div class="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xs">
           <i data-lucide="activity" class="w-4 h-4"></i>
@@ -163,158 +163,10 @@
             </div>
 
             <!-- Legend & Controls -->
-            <div class="flex items-center space-x-4 text-xs font-medium">
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#10B981]"></span>
-                <span>RF 임피던스</span>
-              </div>
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
-                <span>피에조 진동</span>
-              </div>
-              <div class="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
-                <span>열 드리프트</span>
-              </div>
+            <div id="chart-legend" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-medium justify-end max-w-xl">
+              <!-- Dynamically populated by JS -->
             </div>
           </div>
-
-          <!-- Chart Area -->
-          <div class="relative w-full h-[320px] mt-4 bg-gray-50/60 dark:bg-[#0F0F14]/70 rounded-xl p-3 border border-gray-100 dark:border-gray-800/50 overflow-hidden flex flex-col justify-between">
-            
-            <!-- Canvas for custom sensor simulation -->
-            <canvas id="sensorChart" class="w-full h-full block"></canvas>
-
-            <!-- Bottom chart micro-stats -->
-            <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-[#16161C]/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-gray-200/60 dark:border-gray-800/60 font-mono pointer-events-none">
-              <span>관측 윈도우: T-60s → T-0s</span>
-              <span class="text-emerald-600 dark:text-emerald-400 font-medium">노이즈 편차: ±0.012 µm (정상 허용 범위 내)</span>
-              <span>샘플링 속도: 250 Hz</span>
-            </div>
-          </div>
-
-          <!-- Sensor Secondary Indicators -->
-          <div class="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/70 text-center">
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">평균 오차율</span>
-              <p class="text-sm font-semibold font-mono text-gray-800 dark:text-gray-200 mt-0.5">0.014 µm</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">고조파 왜곡률</span>
-              <p class="text-sm font-semibold font-mono text-gray-800 dark:text-gray-200 mt-0.5">0.82 dB</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-gray-50/80 dark:bg-[#1C1C24] border border-gray-200/50 dark:border-gray-800/50">
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">서브스트레이트 틸트</span>
-              <p class="text-sm font-semibold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">0.003°</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom: Alert Timeline Section -->
-        <div class="bg-white dark:bg-[#16161C] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-sm">
-          <div class="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800/70">
-            <div>
-              <h2 class="text-base font-semibold tracking-tight text-gray-900 dark:text-white">이상 탐지 로그</h2>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">실시간 센서 트리거 및 장비 이벤트 타임라인</p>
-            </div>
-            <div class="flex items-center space-x-2 text-xs">
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> 정상
-              </span>
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400 ml-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span> 주의
-              </span>
-              <span class="inline-flex items-center text-gray-500 dark:text-gray-400 ml-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> 위험
-              </span>
-            </div>
-          </div>
-
-          <!-- Alert Log Container (Scrollable) -->
-          <div id="alert-log" class="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
-            
-            <!-- Alert Item 1 (Warning / Amber) -->
-            <div class="p-3.5 rounded-xl bg-amber-50/40 dark:bg-amber-950/20 border-l-4 border-l-amber-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-amber-50/70 dark:hover:bg-amber-950/30">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
-                    주의 · WARNING
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">가스 유량 미세 드리프트 감지</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">14:28:15 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                MFC-3 유량 컨트롤러 질량 유속 +1.8 sccm 편차 발생. 허용 임계치(2.0 sccm) 근접 중. 다음 웨이퍼 배치 전 퍼지 권장.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: MFC-3_GasFlow</span>
-                <span>웨이퍼 ID: #W-8942</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 2 (Normal / Green) -->
-            <div class="p-3.5 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/15 border-l-4 border-l-emerald-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                    정상 · NORMAL
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">RF 정합 네트워크 자동 교정 완료</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">14:15:02 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                가변 커패시터 C14 바이어스 전압 리밸런싱 완료. 임피던스 매칭 위상각 0.02 rad 이내 안정화.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: RF_Match_C14</span>
-                <span>작업자: 자동 시스템</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 3 (Critical / Red) -->
-            <div class="p-3.5 rounded-xl bg-rose-50/30 dark:bg-rose-950/15 border-l-4 border-l-rose-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-rose-50/60 dark:hover:bg-rose-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300">
-                    임계 알람 이력
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">챔버 도어 진공 실링 압력 일시 감압</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">13:42:19 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                진공 게이트 밸브 밀폐 압력 순간 강하(0.15초) 감지 후 즉시 복구됨. O-링 마모도 점검 필요.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: VLV_Gate_P</span>
-                <span>조치: 밸브 체결 확인 완료</span>
-              </div>
-            </div>
-
-            <!-- Alert Item 4 (Normal / Green) -->
-            <div class="p-3.5 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/15 border-l-4 border-l-emerald-500 border border-gray-200/60 dark:border-gray-800/70 transition hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                    정상 · NORMAL
-                  </span>
-                  <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">웨이퍼 척 정전기 흡착압 정상 유지</span>
-                </div>
-                <time class="text-[11px] font-mono text-gray-500 dark:text-gray-400">12:55:40 KST</time>
-              </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
-                ESC (Electrostatic Chuck) 헬륨 냉각 배면압 12.4 Torr 정밀 유지 확인.
-              </p>
-              <div class="mt-2 flex items-center space-x-4 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                <span>센서: ESC_He_BackPressure</span>
-                <span>상태: 최적</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
 
       </section>
 
@@ -480,154 +332,6 @@
       setTheme(isDarkMode);
     });
 
-    // 3. Sensor Canvas Simulation (Apple minimalist smooth waves)
-    const canvas = document.getElementById('sensorChart');
-    const ctx = canvas.getContext('2d');
-    let animationFrameId;
-
-    function resizeCanvas() {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    }
-
-    window.addEventListener('resize', () => {
-      resizeCanvas();
-    });
-    resizeCanvas();
-
-    let step = 0;
-
-    function drawTelemetry() {
-      const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Draw subtle grid lines
-      const isDark = htmlEl.classList.contains('dark');
-      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-      ctx.lineWidth = 1;
-
-      // Horizontal grid
-      for (let y = 30; y < h; y += 45) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-
-      // Vertical time grid
-      for (let x = 0; x < w; x += 75) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-
-      step += 0.025;
-
-      // Stream 1: RF Impedance (Green #10B981)
-      drawWave(w, h, {
-        color: '#10B981',
-        baseY: h * 0.42,
-        amplitude: 24,
-        frequency: 0.012,
-        speed: step,
-        phase: 0.5,
-        noise: 4,
-        lineWidth: 2.2
-      });
-
-      // Stream 2: Piezo Acoustic (Blue #3B82F6)
-      drawWave(w, h, {
-        color: '#3B82F6',
-        baseY: h * 0.56,
-        amplitude: 18,
-        frequency: 0.016,
-        speed: step * 1.2,
-        phase: 2.1,
-        noise: 6,
-        lineWidth: 2
-      });
-
-      // Stream 3: Thermal Drift (Amber #F59E0B)
-      drawWave(w, h, {
-        color: '#F59E0B',
-        baseY: h * 0.30,
-        amplitude: 12,
-        frequency: 0.007,
-        speed: step * 0.6,
-        phase: 4.2,
-        noise: 2,
-        lineWidth: 2
-      });
-
-      animationFrameId = requestAnimationFrame(drawTelemetry);
-    }
-
-    function drawWave(w, h, opts) {
-      ctx.beginPath();
-      ctx.strokeStyle = opts.color;
-      ctx.lineWidth = opts.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      for (let x = 0; x <= w; x += 3) {
-        // Multi-frequency synthesis for realistic sensor signal
-        const primary = Math.sin(x * opts.frequency + opts.speed + opts.phase) * opts.amplitude;
-        const harmonic = Math.sin(x * opts.frequency * 2.5 - opts.speed * 0.8) * (opts.amplitude * 0.25);
-        const pseudoNoise = Math.sin(x * 0.2 + opts.speed * 3) * opts.noise;
-        const y = opts.baseY + primary + harmonic + pseudoNoise;
-
-        if (x === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-    }
-
-    // Start simulation loop
-    drawTelemetry();
-
-    // 4. File Upload interaction feedback
-    const fileInput = document.getElementById('file-upload-input');
-    const fileNameDisplay = document.getElementById('file-name-display');
-    const uploadBtn = document.getElementById('upload-btn');
-    const downloadBtn = document.getElementById('download-report-btn');
-
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        fileNameDisplay.innerHTML = `<span class="text-blue-600 dark:text-blue-400 font-semibold font-sans">선택됨: ${file.name}</span> (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-      }
-    });
-
-    uploadBtn.addEventListener('click', () => {
-      if (fileInput.files && fileInput.files[0]) {
-        const originalText = uploadBtn.innerHTML;
-        uploadBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>업로드 중...</span>`;
-        lucide.createIcons();
-        setTimeout(() => {
-          alert(`'${fileInput.files[0].name}' 정비 리포트가 성공적으로 업로드 및 등록되었습니다.`);
-          uploadBtn.innerHTML = originalText;
-          fileInput.value = '';
-          fileNameDisplay.textContent = 'PDF, XLSX, DOCX (최대 25MB)';
-          lucide.createIcons();
-        }, 800);
-      } else {
-        alert('업로드할 정비 리포트 파일을 먼저 선택해 주세요.');
-      }
-    });
-
-    downloadBtn.addEventListener('click', () => {
-      alert('SOP-SEC-72 플라즈마 에칭 챔버 액션 리포트 PDF 생성을 시작합니다.');
-    });
-  </script>
-</body>
+    \n    // Canvas simulation removed. See stitch_app.js.\n  </script>
+  <script src="/static/stitch_app.js"></script>\n</body>
 </html>

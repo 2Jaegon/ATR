@@ -583,18 +583,27 @@ async def run_llm_agent(anomaly_data, thread_id, status, final_score, duration_t
     })
 
 async def producer():
-    """백그라운드에서 데이터를 큐에 적재 (데이터 수집 디커플링)"""
-    csv_path = "data/phm_data_challenge_2018/test/01_M02_DC_test.csv"
-    if not os.path.exists(csv_path):
-        print(f"[Producer] Error: {csv_path} not found.")
+    """백그라운드에서 데이터를 큐에 적재 (데이터 수집 디커플링) - 다중 파일 순차 재생"""
+    import glob
+    test_dir = "data/phm_data_challenge_2018/test"
+    
+    # Get all csv files, excluding temp files
+    csv_files = sorted([f for f in glob.glob(os.path.join(test_dir, "*.csv")) if not os.path.basename(f).startswith("~$")])
+    
+    if not csv_files:
+        print(f"[Producer] Error: No valid CSV files found in {test_dir}.")
         return
         
     while True:
-        chunk_iter = pd.read_csv(csv_path, chunksize=5)
-        for chunk in chunk_iter:
-            chunk = chunk.ffill().bfill()
-            await telemetry_queue.put(chunk)
-            await asyncio.sleep(0.5)
+        for csv_path in csv_files:
+            print(f"[Producer] Starting stream for {os.path.basename(csv_path)}...")
+            chunk_iter = pd.read_csv(csv_path, chunksize=5)
+            for chunk in chunk_iter:
+                chunk = chunk.ffill().bfill()
+                await telemetry_queue.put(chunk)
+                await asyncio.sleep(0.5)
+            print(f"[Producer] Finished {os.path.basename(csv_path)}. Waiting 3 seconds before next file...")
+            await asyncio.sleep(3)
 
 async def consumer():
     """큐에서 데이터를 꺼내 추론 후 모든 클라이언트에게 브로드캐스트"""
